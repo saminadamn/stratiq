@@ -17,7 +17,7 @@ describe('Dataset ETL flow (integration)', () => {
   let datasetId: string;
 
   beforeAll(async () => {
-    server = createServer();
+    server = await createServer();
 
     const email = `dataset-flow-${randomUUID()}@example.com`;
     const signupResponse = await request(server.app)

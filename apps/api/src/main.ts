@@ -1,6 +1,6 @@
 import { createServer } from './composition-root.js';
 
-const { app, prisma, env } = createServer();
+const { app, prisma, env } = await createServer();
 
 const server = app.listen(env.API_PORT, () => {
   console.log(`StratIQ API listening on port ${env.API_PORT} (${env.NODE_ENV})`);

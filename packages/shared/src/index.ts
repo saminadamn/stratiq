@@ -5,3 +5,4 @@ export * from './types/auth.js';
 export * from './types/api.js';
 export * from './types/dataset.js';
 export * from './types/analytics.js';
+export * from './types/intelligence.js';

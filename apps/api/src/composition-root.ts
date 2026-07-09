@@ -62,6 +62,32 @@ import { GetSavedDashboardViewUseCase } from './application/analytics/use-cases/
 import { UpdateSavedDashboardViewUseCase } from './application/analytics/use-cases/update-saved-dashboard-view.use-case.js';
 import { DeleteSavedDashboardViewUseCase } from './application/analytics/use-cases/delete-saved-dashboard-view.use-case.js';
 
+// Sprint 4 (Analytics Intelligence Layer).
+import { PrismaMetricDefinitionRepository } from './infrastructure/persistence/prisma-metric-definition.repository.js';
+import { PrismaInsightRepository } from './infrastructure/persistence/prisma-insight.repository.js';
+import { PrismaAlertRepository } from './infrastructure/persistence/prisma-alert.repository.js';
+import { PrismaBusinessRuleRepository } from './infrastructure/persistence/prisma-business-rule.repository.js';
+import { DEFAULT_METRIC_DEFINITIONS } from './application/analytics/intelligence/default-metric-definitions.js';
+import { buildMetricCalculators } from './application/analytics/intelligence/metric-calculators.js';
+import { MetricsRegistryService } from './application/analytics/intelligence/metrics-registry.service.js';
+import { TrendDetectionService } from './application/analytics/intelligence/trend-detection.service.js';
+import { BenchmarkEngineService } from './application/analytics/intelligence/benchmark-engine.service.js';
+import { BusinessRulesEngineService } from './application/analytics/intelligence/business-rules-engine.service.js';
+import { InsightEngineService } from './application/analytics/intelligence/insight-engine.service.js';
+import { GenerateIntelligenceService } from './application/analytics/intelligence/generate-intelligence.service.js';
+import { GetMetricsRegistryUseCase } from './application/analytics/intelligence/use-cases/get-metrics-registry.use-case.js';
+import { GetMetricDefinitionUseCase } from './application/analytics/intelligence/use-cases/get-metric-definition.use-case.js';
+import { GetTrendUseCase } from './application/analytics/intelligence/use-cases/get-trend.use-case.js';
+import { GetBenchmarkUseCase } from './application/analytics/intelligence/use-cases/get-benchmark.use-case.js';
+import { GetInsightsUseCase } from './application/analytics/intelligence/use-cases/get-insights.use-case.js';
+import { GetAlertsUseCase } from './application/analytics/intelligence/use-cases/get-alerts.use-case.js';
+import { AcknowledgeAlertUseCase } from './application/analytics/intelligence/use-cases/acknowledge-alert.use-case.js';
+import { ResolveAlertUseCase } from './application/analytics/intelligence/use-cases/resolve-alert.use-case.js';
+import { ListBusinessRulesUseCase } from './application/analytics/intelligence/use-cases/list-business-rules.use-case.js';
+import { CreateBusinessRuleUseCase } from './application/analytics/intelligence/use-cases/create-business-rule.use-case.js';
+import { UpdateBusinessRuleUseCase } from './application/analytics/intelligence/use-cases/update-business-rule.use-case.js';
+import { DeleteBusinessRuleUseCase } from './application/analytics/intelligence/use-cases/delete-business-rule.use-case.js';
+
 export interface Server {
   app: Express;
   prisma: PrismaClient;
@@ -74,7 +100,7 @@ export interface Server {
 // integration tests can build the exact same Express app — real repositories,
 // real Postgres — without also starting an HTTP listener (see
 // src/__tests__/integration/dataset-flow.test.ts).
-export function createServer(): Server {
+export async function createServer(): Promise<Server> {
   const env = loadEnv();
   const prisma = createPrismaClient();
 
@@ -153,6 +179,34 @@ export function createServer(): Server {
     customerAnalyticsService,
     inventoryAnalyticsService,
     analyticsCache,
+  );
+
+  const metricDefinitionRepository = new PrismaMetricDefinitionRepository(prisma);
+  const insightRepository = new PrismaInsightRepository(prisma);
+  const alertRepository = new PrismaAlertRepository(prisma);
+  const businessRuleRepository = new PrismaBusinessRuleRepository(prisma);
+
+  // Idempotent by key — safe to run on every boot (see
+  // default-metric-definitions.ts).
+  await metricDefinitionRepository.upsertMany(DEFAULT_METRIC_DEFINITIONS);
+
+  const metricCalculators = buildMetricCalculators(inventoryAnalyticsService);
+  const metricsRegistryService = new MetricsRegistryService(metricDefinitionRepository);
+  const trendDetectionService = new TrendDetectionService();
+  const benchmarkEngineService = new BenchmarkEngineService();
+  const businessRulesEngineService = new BusinessRulesEngineService();
+  const insightEngineService = new InsightEngineService(
+    trendDetectionService,
+    benchmarkEngineService,
+    businessRulesEngineService,
+  );
+  const generateIntelligenceService = new GenerateIntelligenceService(
+    metricDefinitionRepository,
+    businessRuleRepository,
+    insightRepository,
+    alertRepository,
+    insightEngineService,
+    metricCalculators,
   );
 
   const app = createApp({
@@ -253,6 +307,38 @@ export function createServer(): Server {
         getSavedView: new GetSavedDashboardViewUseCase(savedDashboardViewRepository),
         updateSavedView: new UpdateSavedDashboardViewUseCase(savedDashboardViewRepository),
         deleteSavedView: new DeleteSavedDashboardViewUseCase(savedDashboardViewRepository),
+      },
+      intelligence: {
+        getMetricsRegistry: new GetMetricsRegistryUseCase(metricsRegistryService),
+        getMetricDefinition: new GetMetricDefinitionUseCase(metricsRegistryService),
+        getTrend: new GetTrendUseCase(
+          resolveAnalyticsDataset,
+          metricsRegistryService,
+          inventoryAnalyticsService,
+          trendDetectionService,
+        ),
+        getBenchmark: new GetBenchmarkUseCase(
+          resolveAnalyticsDataset,
+          metricsRegistryService,
+          inventoryAnalyticsService,
+          benchmarkEngineService,
+        ),
+        getInsights: new GetInsightsUseCase(
+          resolveAnalyticsDataset,
+          generateIntelligenceService,
+          insightRepository,
+        ),
+        getAlerts: new GetAlertsUseCase(
+          resolveAnalyticsDataset,
+          generateIntelligenceService,
+          alertRepository,
+        ),
+        acknowledgeAlert: new AcknowledgeAlertUseCase(alertRepository),
+        resolveAlert: new ResolveAlertUseCase(alertRepository),
+        listBusinessRules: new ListBusinessRulesUseCase(businessRuleRepository),
+        createBusinessRule: new CreateBusinessRuleUseCase(businessRuleRepository),
+        updateBusinessRule: new UpdateBusinessRuleUseCase(businessRuleRepository),
+        deleteBusinessRule: new DeleteBusinessRuleUseCase(businessRuleRepository),
       },
       tokenService,
       membershipRepository,

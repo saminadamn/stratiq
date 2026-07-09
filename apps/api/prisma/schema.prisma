@@ -62,6 +62,11 @@ model Organization {
   // Sprint 3 back-relation.
   savedDashboardViews SavedDashboardView[]
 
+  // Sprint 4 (Analytics Intelligence Layer) back-relations.
+  insights      Insight[]
+  alerts        Alert[]
+  businessRules BusinessRule[]
+
   @@map("organizations")
 }
 
@@ -324,4 +329,169 @@ model SavedDashboardView {
 
   @@index([organizationId, dashboardType])
   @@map("saved_dashboard_views")
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 4: Analytics Intelligence Layer
+//
+// Design notes (full rationale in docs/ARCHITECTURE.md):
+// - MetricDefinition is the Metrics Registry: global reference metadata
+//   (name/description/category/formula/unit/owner/refreshPolicy), seeded
+//   idempotently at startup. It is NOT organization-scoped — it describes
+//   metric *types*, not an organization's data. The actual calculation
+//   functions live in code (application/analytics/intelligence/metric-
+//   calculators.ts), reusing Sprint 3's KPI engine — this table is metadata
+//   only, same split real metrics-layer platforms use.
+// - Trends and benchmarks are NOT persisted here — they're computed live,
+//   same on-demand model as every other Sprint 3 dashboard. Insights and
+//   Alerts ARE persisted, because "Insight Timeline" and "historical
+//   tracking" are explicit requirements: they're business events, not
+//   derived views.
+// - Insights/Alerts are generated once per immutable DatasetVersion and then
+//   read from storage on subsequent requests (same immutability-enables-
+//   caching trick as Sprint 3's analytics cache) — a `refresh` flag creates a
+//   new timeline entry rather than overwriting history.
+// ---------------------------------------------------------------------------
+
+enum MetricCategory {
+  REVENUE
+  PROFITABILITY
+  CUSTOMER
+  PRODUCT
+  INVENTORY
+  GROWTH
+}
+
+enum MetricUnit {
+  CURRENCY
+  PERCENTAGE
+  COUNT
+  RATIO
+}
+
+enum MetricRefreshPolicy {
+  REALTIME
+  DAILY
+  ON_DATASET_UPLOAD
+}
+
+model MetricDefinition {
+  id            String              @id @default(cuid())
+  key           String              @unique
+  name          String
+  description   String
+  category      MetricCategory
+  formula       String
+  unit          MetricUnit
+  owner         String
+  refreshPolicy MetricRefreshPolicy
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@map("metric_definitions")
+}
+
+enum TrendDirection {
+  INCREASING
+  STABLE
+  DECLINING
+  SEASONAL
+}
+
+enum InsightSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model Insight {
+  id               String          @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  metricKey        String
+  title            String
+  narrative        String
+  trend            TrendDirection?
+  severity         InsightSeverity
+  currentValue     Float
+  previousValue    Float?
+  changePercent    Float?
+  // Extra structured context (triggered rule ids, outlier periods) — kept as
+  // JSON rather than new columns since its shape varies per insight and
+  // nothing needs to query into it relationally.
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([datasetVersionId])
+  @@map("insights")
+}
+
+enum AlertSeverity {
+  INFORMATIONAL
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Alert {
+  id               String        @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  metricKey        String
+  ruleId           String?
+  severity         AlertSeverity
+  message          String
+  currentValue     Float
+  thresholdValue   Float?
+  status           AlertStatus   @default(OPEN)
+  createdAt        DateTime      @default(now())
+  resolvedAt       DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // A deleted rule shouldn't take its historical alerts down with it —
+  // SetNull keeps the alert as a record of "something fired," even if the
+  // rule that fired it no longer exists.
+  rule         BusinessRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([datasetVersionId])
+  @@map("alerts")
+}
+
+enum RuleComparator {
+  VALUE_ABOVE
+  VALUE_BELOW
+  PERCENT_CHANGE_ABOVE
+  PERCENT_CHANGE_BELOW
+}
+
+model BusinessRule {
+  id             String         @id @default(cuid())
+  organizationId String
+  metricKey      String
+  name           String
+  comparator     RuleComparator
+  thresholdValue Float
+  severity       AlertSeverity
+  isActive       Boolean        @default(true)
+  // Marks a rule as one of the lazily-seeded defaults (see
+  // default-business-rules.ts) rather than something a user configured —
+  // informational only, doesn't change evaluation.
+  isDefault      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  alerts       Alert[]
+
+  @@index([organizationId, metricKey])
+  @@map("business_rules")
 }

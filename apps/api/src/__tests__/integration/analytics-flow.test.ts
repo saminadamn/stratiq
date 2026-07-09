@@ -15,7 +15,7 @@ describe('Analytics API (integration)', () => {
   let datasetId: string;
 
   beforeAll(async () => {
-    server = createServer();
+    server = await createServer();
 
     const email = `analytics-flow-${randomUUID()}@example.com`;
     const signupResponse = await request(server.app)

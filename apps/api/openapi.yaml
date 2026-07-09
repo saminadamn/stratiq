@@ -1,15 +1,19 @@
 openapi: 3.0.3
 info:
   title: StratIQ API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     Sprint 2 adds the Data Management & ETL Foundation: dataset upload
     (CSV/Excel), validation, cleaning, versioning, feature engineering, and
     history. Sprint 3 adds the Business Intelligence & Analytics Engine: KPIs,
     the four dashboards (executive/customer/product/inventory), saved
-    filter views, and CSV/PDF export. Auth/organization endpoints from
-    Sprint 1 are omitted here since this document focuses on what Sprints 2
-    and 3 added — see docs/ARCHITECTURE.md for the full picture.
+    filter views, and CSV/PDF export. Sprint 4 adds the Analytics
+    Intelligence Layer: the Metrics Registry, deterministic Trend Detection,
+    Benchmark comparisons (MoM/QoQ/YoY), a configurable Business Rules
+    Engine, and the Insight/Alert Timeline generated from them. Auth/
+    organization endpoints from Sprint 1 are omitted here since this
+    document focuses on what Sprints 2-4 added — see docs/ARCHITECTURE.md
+    for the full picture.
 servers:
   - url: http://localhost:4000/api/v1
 security:
@@ -481,6 +485,240 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /organizations/{organizationId}/analytics/metrics:
+    get:
+      summary: List every metric in the Metrics Registry
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+      responses:
+        '200':
+          description: All known metric definitions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    type: array
+                    items: { $ref: '#/components/schemas/MetricDefinition' }
+
+  /organizations/{organizationId}/analytics/metrics/{metricKey}:
+    get:
+      summary: Get one metric's registry metadata
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/metricKey'
+      responses:
+        '200':
+          description: Metric definition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDefinition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations/{organizationId}/analytics/trends/{metricKey}:
+    get:
+      summary: Deterministic trend classification for a metric (Increasing/Stable/Declining/Seasonal) with outliers
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/metricKey'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+      responses:
+        '200':
+          description: Trend analysis over the metric's monthly series.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendAnalysis'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The metric cannot be computed for the current dataset (e.g. no date column).
+
+  /organizations/{organizationId}/analytics/benchmarks/{metricKey}:
+    get:
+      summary: Compare a metric's current period against the previous one (MoM/QoQ/YoY)
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/metricKey'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - name: period
+          in: query
+          schema: { type: string, enum: [MONTH, QUARTER, YEAR], default: MONTH }
+      responses:
+        '200':
+          description: Benchmark comparison. "Current" is anchored to the latest date present in the dataset, not the system clock.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchmarkResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: The metric cannot be computed for the current dataset (e.g. no date column).
+
+  /organizations/{organizationId}/analytics/insights:
+    get:
+      summary: Insight Timeline — chronological, rule-based narrative insights per metric
+      description: |
+        Insights are generated once per immutable dataset version and reused
+        afterward; pass forceRefresh=true to regenerate.
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: forceRefresh
+          in: query
+          schema: { type: string, enum: ['true', 'false'], default: 'false' }
+      responses:
+        '200':
+          description: Insights, most recent first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  insights:
+                    type: array
+                    items: { $ref: '#/components/schemas/Insight' }
+
+  /organizations/{organizationId}/analytics/alerts:
+    get:
+      summary: List alerts raised by the Business Rules Engine
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        - name: forceRefresh
+          in: query
+          schema: { type: string, enum: ['true', 'false'], default: 'false' }
+      responses:
+        '200':
+          description: Alerts, most recent first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alerts:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+
+  /organizations/{organizationId}/analytics/alerts/{alertId}/acknowledge:
+    post:
+      summary: Acknowledge an alert
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/alertId'
+      responses:
+        '200':
+          description: Alert with status set to ACKNOWLEDGED.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations/{organizationId}/analytics/alerts/{alertId}/resolve:
+    post:
+      summary: Resolve an alert
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/alertId'
+      responses:
+        '200':
+          description: Alert with status set to RESOLVED and resolvedAt populated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations/{organizationId}/analytics/rules:
+    get:
+      summary: List business rules (four platform defaults are lazily seeded per organization)
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+      responses:
+        '200':
+          description: Business rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items: { $ref: '#/components/schemas/BusinessRule' }
+    post:
+      summary: Create a custom business rule
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBusinessRuleRequest'
+      responses:
+        '201':
+          description: Rule created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessRule'
+
+  /organizations/{organizationId}/analytics/rules/{ruleId}:
+    patch:
+      summary: Update a business rule's threshold, severity, name, or active state
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/ruleId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBusinessRuleRequest'
+      responses:
+        '200':
+          description: Updated rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessRule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Delete a business rule
+      tags: [Intelligence]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -538,6 +776,22 @@ components:
       name: customerSegment
       in: query
       schema: { type: string, enum: [NEW, RETURNING, LOYAL] }
+    metricKey:
+      name: metricKey
+      in: path
+      required: true
+      schema: { type: string }
+      description: A key from the Metrics Registry (e.g. revenue, profitMargin, inventoryTurnover).
+    alertId:
+      name: alertId
+      in: path
+      required: true
+      schema: { type: string }
+    ruleId:
+      name: ruleId
+      in: path
+      required: true
+      schema: { type: string }
 
   responses:
     BadRequest:
@@ -965,3 +1219,121 @@ components:
           properties:
             id: { type: string }
             name: { type: string }
+
+    MetricDefinition:
+      type: object
+      description: One entry from the Metrics Registry — metadata only; the actual computation lives in the KPI engine (see docs/ARCHITECTURE.md).
+      properties:
+        key: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category:
+          type: string
+          enum: [REVENUE, PROFITABILITY, CUSTOMER, PRODUCT, INVENTORY, GROWTH]
+        formula: { type: string }
+        unit:
+          type: string
+          enum: [CURRENCY, PERCENTAGE, COUNT, RATIO]
+        owner: { type: string }
+        refreshPolicy:
+          type: string
+          enum: [REALTIME, DAILY, ON_DATASET_UPLOAD]
+
+    TrendOutlier:
+      type: object
+      properties:
+        period: { type: string }
+        value: { type: number }
+        zScore: { type: number }
+
+    TrendAnalysis:
+      type: object
+      properties:
+        metricKey: { type: string }
+        direction: { type: string, enum: [INCREASING, STABLE, DECLINING, SEASONAL] }
+        averageChangePercent: { type: number, nullable: true }
+        series:
+          type: array
+          items: { $ref: '#/components/schemas/TimeSeriesPoint' }
+        outliers:
+          type: array
+          items: { $ref: '#/components/schemas/TrendOutlier' }
+
+    BenchmarkResult:
+      type: object
+      properties:
+        metricKey: { type: string }
+        period: { type: string, enum: [MONTH, QUARTER, YEAR] }
+        currentPeriodLabel: { type: string }
+        previousPeriodLabel: { type: string }
+        currentValue: { type: number, nullable: true }
+        previousValue: { type: number, nullable: true }
+        changeAbsolute: { type: number, nullable: true }
+        changePercent: { type: number, nullable: true }
+
+    Insight:
+      type: object
+      description: One entry in the Insight Timeline — a human-readable narrative composed from Trend Detection, the Benchmark Engine, and any Business Rules that fired.
+      properties:
+        id: { type: string }
+        metricKey: { type: string }
+        title: { type: string }
+        narrative: { type: string }
+        trend: { type: string, enum: [INCREASING, STABLE, DECLINING, SEASONAL], nullable: true }
+        severity: { type: string, enum: [INFO, WARNING, CRITICAL] }
+        currentValue: { type: number }
+        previousValue: { type: number, nullable: true }
+        changePercent: { type: number, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Alert:
+      type: object
+      properties:
+        id: { type: string }
+        metricKey: { type: string }
+        ruleId: { type: string, nullable: true }
+        severity: { type: string, enum: [INFORMATIONAL, WARNING, CRITICAL] }
+        message: { type: string }
+        currentValue: { type: number }
+        thresholdValue: { type: number, nullable: true }
+        status: { type: string, enum: [OPEN, ACKNOWLEDGED, RESOLVED] }
+        createdAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+
+    BusinessRule:
+      type: object
+      properties:
+        id: { type: string }
+        metricKey: { type: string }
+        name: { type: string }
+        comparator:
+          type: string
+          enum: [VALUE_ABOVE, VALUE_BELOW, PERCENT_CHANGE_ABOVE, PERCENT_CHANGE_BELOW]
+        thresholdValue: { type: number }
+        severity: { type: string, enum: [INFORMATIONAL, WARNING, CRITICAL] }
+        isActive: { type: boolean }
+        isDefault:
+          type: boolean
+          description: True for the four platform-seeded defaults; false for user-created rules.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateBusinessRuleRequest:
+      type: object
+      required: [metricKey, name, comparator, thresholdValue, severity]
+      properties:
+        metricKey: { type: string }
+        name: { type: string }
+        comparator:
+          type: string
+          enum: [VALUE_ABOVE, VALUE_BELOW, PERCENT_CHANGE_ABOVE, PERCENT_CHANGE_BELOW]
+        thresholdValue: { type: number }
+        severity: { type: string, enum: [INFORMATIONAL, WARNING, CRITICAL] }
+
+    UpdateBusinessRuleRequest:
+      type: object
+      properties:
+        name: { type: string }
+        thresholdValue: { type: number }
+        severity: { type: string, enum: [INFORMATIONAL, WARNING, CRITICAL] }
+        isActive: { type: boolean }
