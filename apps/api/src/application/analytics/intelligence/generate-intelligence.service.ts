@@ -15,6 +15,13 @@ import { computeMetricMonthlySeries } from './metric-time-series.js';
 // rather than on every request, so this is only ever called from a use case
 // that first checks whether generation is needed.
 export class GenerateIntelligenceService {
+  // The Insights and Alerts panels mount together and both call
+  // ensureGenerated for the same dataset version; without this, both could
+  // read countByDatasetVersion === 0 before either had inserted anything and
+  // double-generate. Keyed by datasetVersionId so unrelated dataset versions
+  // still generate concurrently.
+  private readonly inFlight = new Map<string, Promise<void>>();
+
   constructor(
     private readonly metricDefinitions: MetricDefinitionRepository,
     private readonly businessRules: BusinessRuleRepository,
@@ -25,6 +32,23 @@ export class GenerateIntelligenceService {
   ) {}
 
   async ensureGenerated(
+    organizationId: string,
+    context: AnalyticsDatasetContext,
+    forceRefresh: boolean,
+  ): Promise<void> {
+    const existing = this.inFlight.get(context.datasetVersionId);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = this.generate(organizationId, context, forceRefresh).finally(() => {
+      this.inFlight.delete(context.datasetVersionId);
+    });
+    this.inFlight.set(context.datasetVersionId, promise);
+    return promise;
+  }
+
+  private async generate(
     organizationId: string,
     context: AnalyticsDatasetContext,
     forceRefresh: boolean,
