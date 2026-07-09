@@ -1,0 +1,40 @@
+{
+  "name": "stratiq",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "StratIQ - Enterprise Business Intelligence & Decision Intelligence Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run build -w @stratiq/shared && npm run dev -w @stratiq/api",
+    "dev:web": "npm run build -w @stratiq/shared && npm run dev -w @stratiq/web",
+    "build": "npm run build -w @stratiq/shared && npm run build -w @stratiq/api && npm run build -w @stratiq/web",
+    "typecheck": "npm run typecheck -w @stratiq/shared && npm run typecheck -w @stratiq/api && npm run typecheck -w @stratiq/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test -w @stratiq/api",
+    "prisma:generate": "npm run prisma:generate -w @stratiq/api",
+    "prisma:migrate": "npm run prisma:migrate -w @stratiq/api",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w @stratiq/api",
+    "prisma:seed": "npm run prisma:seed -w @stratiq/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.15.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

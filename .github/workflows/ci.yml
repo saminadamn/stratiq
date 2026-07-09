@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-typecheck-build-test:
+    runs-on: ubuntu-latest
+
+    # Real Postgres so integration tests (Sprint 2 dataset ETL flow) hit an
+    # actual database, not a mock — the whole point of testing the ETL
+    # pipeline is to catch problems that only show up against real Postgres
+    # JSON columns, transactions, etc.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stratiq
+          POSTGRES_PASSWORD: stratiq_test_password
+          POSTGRES_DB: stratiq_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stratiq -d stratiq_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://stratiq:stratiq_test_password@localhost:5432/stratiq_test?schema=public
+      JWT_ACCESS_SECRET: ci-placeholder-access-secret-please-change-32chars
+      JWT_REFRESH_SECRET: ci-placeholder-refresh-secret-please-change-32chars
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        run: npm run prisma:migrate:deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm run test

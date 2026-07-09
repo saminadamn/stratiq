@@ -1,0 +1,327 @@
+// StratIQ database schema.
+//
+// Design notes (see docs/ARCHITECTURE.md for the full rationale):
+// - Role lives on `Membership`, not `User` — a user's permissions are always scoped
+//   to one organization, never global, because the same person can hold different
+//   roles in different organizations (workspaces).
+// - `RefreshToken` stores only a hash of the token, never the token itself, so a
+//   database leak doesn't hand out valid sessions.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+
+  // Sprint 2 (Data Management & ETL) back-relations. Added without touching any
+  // existing field above — see docs/ARCHITECTURE.md "Sprint 2" section.
+  createdDatasets        Dataset[]
+  createdDatasetVersions DatasetVersion[]
+  uploadedFiles          UploadedFile[]
+
+  // Sprint 3 (Analytics) back-relation.
+  savedDashboardViews SavedDashboardView[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+
+  // Sprint 2 back-relations.
+  datasets      Dataset[]
+  uploadedFiles UploadedFile[]
+
+  // Sprint 3 back-relation.
+  savedDashboardViews SavedDashboardView[]
+
+  @@map("organizations")
+}
+
+// Join model carrying the role — this *is* the RBAC model. Every authorization
+// check resolves a role by looking up (userId, organizationId) here.
+model Membership {
+  id             String   @id @default(cuid())
+  role           Role
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A user can only hold one role per organization.
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+// One row per issued refresh token, enabling rotation and revocation. Access
+// tokens are intentionally NOT persisted — they're short-lived and stateless.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  // Points at the token that replaced this one, so a reused (already-rotated)
+  // refresh token is detectable as a replay/theft signal.
+  replacedByTokenId String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 2: Data Management & ETL Foundation
+//
+// Design notes (full rationale in docs/ARCHITECTURE.md):
+// - No dynamic `CREATE TABLE` per dataset. Arbitrary user-uploaded schemas are
+//   stored as JSONB rows in `DatasetRow` instead — this keeps the schema
+//   flexible without runtime DDL (a SQL-injection and migration-management
+//   risk) while still living in PostgreSQL as the pipeline diagram requires.
+// - A dataset is versioned via `DatasetVersion`, one row per upload/clean
+//   result. "Current version" is derived (highest `versionNumber`), not
+//   stored as a pointer, so there's no circular FK between Dataset and
+//   DatasetVersion to manage.
+// - `EtlJob`/`EtlLog` capture one pipeline run and its stage-by-stage output,
+//   which is what powers the "Processing Logs" UI.
+// ---------------------------------------------------------------------------
+
+enum DatasetStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum CleaningMode {
+  NONE
+  AUTOMATIC
+  MANUAL
+}
+
+enum SourceFileType {
+  CSV
+  XLSX
+}
+
+enum EtlJobStatus {
+  PENDING
+  VALIDATING
+  CLEANING
+  TRANSFORMING
+  FEATURE_ENGINEERING
+  SAVING
+  COMPLETED
+  FAILED
+}
+
+enum EtlLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+// The logical, named dataset a user thinks of as "Sales Dataset". Its actual
+// data lives in versions — this row is mostly identity + org ownership.
+model Dataset {
+  id             String        @id @default(cuid())
+  organizationId String
+  name           String
+  status         DatasetStatus @default(UPLOADING)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  versions     DatasetVersion[]
+
+  @@index([organizationId])
+  @@map("datasets")
+}
+
+// One immutable snapshot of a dataset: a specific upload or the output of a
+// cleaning operation. `schema` records the detected column names/types so the
+// UI can render a preview table without re-parsing the source file.
+model DatasetVersion {
+  id                String       @id @default(cuid())
+  datasetId         String
+  versionNumber     Int
+  uploadedFileId     String?     @unique
+  rowCount          Int
+  columnCount       Int
+  schema            Json
+  qualityScore      Int?
+  validationReport  Json?
+  cleaningMode      CleaningMode @default(NONE)
+  cleaningLog       Json?
+  processingTimeMs  Int?
+  createdById       String
+  createdAt         DateTime     @default(now())
+
+  dataset      Dataset         @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  uploadedFile UploadedFile?   @relation(fields: [uploadedFileId], references: [id])
+  createdBy    User            @relation(fields: [createdById], references: [id])
+  rows         DatasetRow[]
+  etlJobs      EtlJob[]
+  featureSets  FeatureSet[]
+
+  @@unique([datasetId, versionNumber])
+  @@map("dataset_versions")
+}
+
+// Row-level storage for a version's tabular data as JSONB — see the file-level
+// note above for why this replaces per-dataset SQL tables.
+model DatasetRow {
+  id               String @id @default(cuid())
+  datasetVersionId String
+  rowIndex         Int
+  data             Json
+
+  datasetVersion DatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+
+  @@index([datasetVersionId, rowIndex])
+  @@map("dataset_rows")
+}
+
+// Metadata + storage location for a raw uploaded file. The file bytes
+// themselves live on disk (or object storage in production) under a
+// generated name — never the user-supplied filename — to prevent path
+// traversal and filename collisions.
+model UploadedFile {
+  id               String         @id @default(cuid())
+  organizationId   String
+  originalFileName String
+  storedFileName   String
+  storagePath      String
+  fileType         SourceFileType
+  mimeType         String
+  fileSizeBytes    Int
+  checksumSha256   String
+  uploadedById     String
+  createdAt        DateTime       @default(now())
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy     User            @relation(fields: [uploadedById], references: [id])
+  datasetVersion DatasetVersion?
+
+  @@index([organizationId])
+  @@map("uploaded_files")
+}
+
+// One pipeline run (upload → validation → cleaning → transformation →
+// feature engineering → saving) for a single dataset version.
+model EtlJob {
+  id               String       @id @default(cuid())
+  datasetVersionId String
+  status           EtlJobStatus @default(PENDING)
+  startedAt        DateTime     @default(now())
+  completedAt      DateTime?
+  errorMessage     String?
+
+  datasetVersion DatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+  logs           EtlLog[]
+
+  @@index([datasetVersionId])
+  @@map("etl_jobs")
+}
+
+// Stage-by-stage log lines for one EtlJob — what the "Processing Logs" UI reads.
+model EtlLog {
+  id        String      @id @default(cuid())
+  etlJobId  String
+  stage     String
+  level     EtlLogLevel @default(INFO)
+  message   String
+  createdAt DateTime    @default(now())
+
+  etlJob EtlJob @relation(fields: [etlJobId], references: [id], onDelete: Cascade)
+
+  @@index([etlJobId])
+  @@map("etl_logs")
+}
+
+// A computed business metric for a dataset version (e.g. Average Order
+// Value). `value` is a JSON scalar or breakdown (e.g. a monthly series) since
+// metrics vary in shape.
+model FeatureSet {
+  id               String   @id @default(cuid())
+  datasetVersionId String
+  name             String
+  label            String
+  value            Json
+  createdAt        DateTime @default(now())
+
+  datasetVersion DatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetVersionId, name])
+  @@map("feature_sets")
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 3: Business Intelligence & Analytics Engine
+//
+// Design notes (full rationale in docs/ARCHITECTURE.md):
+// - Analytics has no dedicated fact tables of its own — it computes on top of
+//   Sprint 2's DatasetRow JSONB storage, choosing an organization's latest
+//   READY dataset (or an explicit override) as its data source. The only new
+//   persisted concept this sprint introduces is a *saved filter preset*.
+// - Filters are stored as JSON rather than normalized columns because the
+//   filter shape (date range, category, region, product, segment) is a
+//   frontend/API contract (packages/shared), not something the database
+//   needs to query into.
+// ---------------------------------------------------------------------------
+
+enum DashboardType {
+  EXECUTIVE
+  CUSTOMER
+  PRODUCT
+  INVENTORY
+}
+
+model SavedDashboardView {
+  id             String        @id @default(cuid())
+  organizationId String
+  createdById    String
+  name           String
+  dashboardType  DashboardType
+  filters        Json
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId, dashboardType])
+  @@map("saved_dashboard_views")
+}

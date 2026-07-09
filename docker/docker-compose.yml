@@ -1,0 +1,70 @@
+# Local development stack. Run from the repo root:
+#   docker compose -f docker/docker-compose.yml up -d db      # just Postgres
+#   docker compose -f docker/docker-compose.yml up --build     # everything
+#
+# `env_file: ../.env` on api/web injects the full variable set into the
+# container process; `environment:` below overrides DATABASE_URL specifically
+# because inside the compose network Postgres is reachable at host "db", not
+# "localhost" as .env.example assumes for host-run processes.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stratiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stratiq_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-stratiq}
+    ports:
+      # Host-side port only; see .env.example for why this isn't 5432.
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - stratiq_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-stratiq} -d ${POSTGRES_DB:-stratiq}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stratiq}:${POSTGRES_PASSWORD:-stratiq_dev_password}@db:5432/${POSTGRES_DB:-stratiq}?schema=public
+    ports:
+      - '${API_PORT:-4000}:4000'
+    volumes:
+      # Bind-mount the whole monorepo for hot reload; anonymous volumes on
+      # every node_modules keep the container's installed deps from being
+      # shadowed by the host's (possibly absent or different-OS) node_modules.
+      - ..:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run dev:api
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    env_file:
+      - ../.env
+    ports:
+      - '5173:5173'
+    volumes:
+      - ..:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+    depends_on:
+      - api
+    command: npm run dev:web
+
+volumes:
+  stratiq_postgres_data:
