@@ -3,6 +3,7 @@ import { toPng } from 'html-to-image';
 import type { AnalyticsFiltersDto, DashboardType, ExportFormat } from '@stratiq/shared';
 import { useAuth } from '../../auth/auth-context';
 import { exportDashboard } from '../../lib/analytics-api';
+import { downloadBlob } from '../../lib/download-blob';
 
 interface ExportMenuProps {
   dashboardType: DashboardType;
@@ -12,17 +13,6 @@ interface ExportMenuProps {
   // than server-side (see docs/ARCHITECTURE.md, "Export: CSV/PDF
   // server-side, PNG client-side").
   pngTargetRef?: RefObject<HTMLElement>;
-}
-
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 export function ExportMenu({

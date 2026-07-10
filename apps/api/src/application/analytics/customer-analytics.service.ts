@@ -26,20 +26,24 @@ type Row = Record<string, unknown>;
 // Everything this service computes derives from one shared per-customer
 // aggregate, built in a single pass over the rows — segments, top customers,
 // the frequency histogram, and cohort analysis all read from this instead of
-// each re-scanning the dataset with slightly different logic.
-interface CustomerAggregate {
+// each re-scanning the dataset with slightly different logic. Exported (with
+// `lastOrderDate`) so the v1.0 Feature Store (feature-store.service.ts) can
+// derive RFM features from the exact same aggregate rather than re-deriving
+// "who is a customer, how much have they spent" a second time.
+export interface CustomerAggregate {
   customerId: string;
   customerName: string;
   region: string | null;
   orderKeys: Set<unknown>;
   months: Set<string>;
   totalSpent: number;
+  lastOrderDate: Date | null;
 }
 
 const MAX_COHORT_PERIODS = 12;
 const TOP_CUSTOMERS_LIMIT = 10;
 
-function buildCustomerAggregates(
+export function buildCustomerAggregates(
   rows: Row[],
   columns: AnalyticsColumns,
 ): Map<string, CustomerAggregate> {
@@ -58,6 +62,7 @@ function buildCustomerAggregates(
       orderKeys: new Set<unknown>(),
       months: new Set<string>(),
       totalSpent: 0,
+      lastOrderDate: null,
     };
 
     aggregate.orderKeys.add(columns.orderId ? rowOrderId(row, columns) : row);
@@ -65,6 +70,9 @@ function buildCustomerAggregates(
     const date = rowDate(row, columns);
     if (date) {
       aggregate.months.add(monthKey(date));
+      if (!aggregate.lastOrderDate || date > aggregate.lastOrderDate) {
+        aggregate.lastOrderDate = date;
+      }
     }
 
     const revenue = rowRevenue(row, columns);

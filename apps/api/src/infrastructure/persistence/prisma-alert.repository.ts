@@ -60,4 +60,12 @@ export class PrismaAlertRepository implements AlertRepository {
     });
     return toDomain(row);
   }
+
+  async findByDatasetVersion(datasetVersionId: string): Promise<Alert[]> {
+    const rows = await this.prisma.alert.findMany({
+      where: { datasetVersionId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map(toDomain);
+  }
 }

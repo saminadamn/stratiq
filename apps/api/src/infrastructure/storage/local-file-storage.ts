@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FileStorage, SavedFile } from '../../application/ports/file-storage.port.js';
 
@@ -38,5 +38,9 @@ export class LocalFileStorage implements FileStorage {
     // Deleting an already-missing file shouldn't fail the caller (e.g. a
     // dataset delete that races a manual cleanup) — it's a no-op either way.
     await unlink(path.join(this.rootDir, storagePath)).catch(() => undefined);
+  }
+
+  async read(storagePath: string): Promise<Buffer> {
+    return readFile(path.join(this.rootDir, storagePath));
   }
 }

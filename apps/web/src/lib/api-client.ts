@@ -121,4 +121,6 @@ export const apiClient = {
     requestWithRefresh<T>(path, { method: 'DELETE', auth }),
   postForBlob: (path: string, body?: unknown, auth = true): Promise<Blob> =>
     requestWithRefresh<Blob>(path, { method: 'POST', body, auth, responseType: 'blob' }),
+  getForBlob: (path: string, auth = true): Promise<Blob> =>
+    requestWithRefresh<Blob>(path, { method: 'GET', auth, responseType: 'blob' }),
 };

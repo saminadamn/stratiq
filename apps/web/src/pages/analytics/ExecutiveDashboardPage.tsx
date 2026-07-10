@@ -11,10 +11,12 @@ import { LineTrendChart } from '../../components/charts/LineTrendChart';
 import { PieBreakdownChart } from '../../components/charts/PieBreakdownChart';
 import { AlertsPanel } from '../../components/analytics/AlertsPanel';
 import { BenchmarkCard } from '../../components/analytics/BenchmarkCard';
+import { DecisionIntelligencePanel } from '../../components/analytics/DecisionIntelligencePanel';
 import { ExportMenu } from '../../components/analytics/ExportMenu';
 import { FilterBar } from '../../components/analytics/FilterBar';
 import { InsightsPanel } from '../../components/analytics/InsightsPanel';
 import { KpiCard } from '../../components/analytics/KpiCard';
+import { PredictionsPanel } from '../../components/analytics/PredictionsPanel';
 import { SavedViewsMenu } from '../../components/analytics/SavedViewsMenu';
 import { TrendIndicator } from '../../components/analytics/TrendIndicator';
 
@@ -193,6 +195,11 @@ export function ExecutiveDashboardPage(): JSX.Element {
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <InsightsPanel organizationId={organizationId} />
           <AlertsPanel organizationId={organizationId} />
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <PredictionsPanel organizationId={organizationId} />
+          <DecisionIntelligencePanel organizationId={organizationId} />
         </div>
       </div>
     </div>

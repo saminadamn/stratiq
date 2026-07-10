@@ -21,4 +21,8 @@ export interface InsightRepository {
   // been analyzed."
   countByDatasetVersion(datasetVersionId: string): Promise<number>;
   listByOrganization(organizationId: string, limit: number): Promise<Insight[]>;
+  // v1.0: the Decision Intelligence Engine needs this dataset version's own
+  // insights specifically, not just "the org's most recent N" — added here
+  // rather than filtering listByOrganization client-side.
+  findByDatasetVersion(datasetVersionId: string): Promise<Insight[]>;
 }

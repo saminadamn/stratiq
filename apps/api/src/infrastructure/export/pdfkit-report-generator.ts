@@ -3,13 +3,16 @@ import type {
   PdfReportRequest,
   ReportGenerator,
 } from '../../application/ports/report-generator.port.js';
+import { drawChart } from './pdf-chart-helpers.js';
 
 // Formatted tabular report, not a pixel-perfect capture of the dashboard UI
 // — rendering actual charts server-side would need a headless browser
 // (Puppeteer) purely to rasterize a page, which is a heavy dependency for
-// this sprint's scope. PNG chart export is handled client-side instead (the
-// charts are already rendered SVG in the browser) — see
-// docs/ARCHITECTURE.md, "Export: CSV/PDF server-side, PNG client-side".
+// this project's scope. v1.0 embeds simple bar/line charts as native PDFKit
+// vector primitives instead (see pdf-chart-helpers.ts). Full-fidelity PNG
+// chart export is still handled client-side, from the browser's rendered
+// SVG — see docs/ARCHITECTURE.md, "Export: CSV/PDF server-side, PNG
+// client-side".
 export class PdfKitReportGenerator implements ReportGenerator {
   async generatePdf(request: PdfReportRequest): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -28,6 +31,12 @@ export class PdfKitReportGenerator implements ReportGenerator {
       for (const section of request.sections) {
         doc.fontSize(14).text(section.heading);
         doc.moveDown(0.3);
+
+        if (section.chart) {
+          const chartWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+          drawChart(doc, section.chart, doc.x, doc.y, chartWidth);
+          doc.moveDown();
+        }
 
         if (section.rows.length === 0) {
           doc.fontSize(10).fillColor('gray').text('No data available.');

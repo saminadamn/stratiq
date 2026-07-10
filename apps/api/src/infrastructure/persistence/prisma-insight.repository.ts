@@ -56,4 +56,12 @@ export class PrismaInsightRepository implements InsightRepository {
     });
     return rows.map(toDomain);
   }
+
+  async findByDatasetVersion(datasetVersionId: string): Promise<Insight[]> {
+    const rows = await this.prisma.insight.findMany({
+      where: { datasetVersionId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map(toDomain);
+  }
 }

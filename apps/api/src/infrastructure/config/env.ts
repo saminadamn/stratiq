@@ -18,6 +18,10 @@ const envSchema = z.object({
   // uploads survive container restarts (see docker/docker-compose.yml).
   STORAGE_ROOT: z.string().default('./storage'),
   MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(25),
+
+  // v1.0 (Predictive Intelligence). The ML service is internal-only — this
+  // is a Docker-network hostname in production, not a public URL.
+  ML_SERVICE_URL: z.string().default('http://localhost:8000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

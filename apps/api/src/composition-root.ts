@@ -88,6 +88,31 @@ import { CreateBusinessRuleUseCase } from './application/analytics/intelligence/
 import { UpdateBusinessRuleUseCase } from './application/analytics/intelligence/use-cases/update-business-rule.use-case.js';
 import { DeleteBusinessRuleUseCase } from './application/analytics/intelligence/use-cases/delete-business-rule.use-case.js';
 
+// v1.0 (Predictive Intelligence).
+import { PrismaMlFeatureSnapshotRepository } from './infrastructure/persistence/prisma-ml-feature-snapshot.repository.js';
+import { PrismaMlModelRepository } from './infrastructure/persistence/prisma-ml-model.repository.js';
+import { PrismaPredictionRepository } from './infrastructure/persistence/prisma-prediction.repository.js';
+import { HttpMlServiceClient } from './infrastructure/ml/http-ml-service-client.js';
+import { FeatureStoreService } from './application/analytics/ml/feature-store.service.js';
+import { GetChurnPredictionsUseCase } from './application/analytics/ml/use-cases/get-churn-predictions.use-case.js';
+import { GetSalesForecastUseCase } from './application/analytics/ml/use-cases/get-sales-forecast.use-case.js';
+import { GetCustomerSegmentsUseCase } from './application/analytics/ml/use-cases/get-customer-segments.use-case.js';
+import { GetProductRecommendationsUseCase } from './application/analytics/ml/use-cases/get-product-recommendations.use-case.js';
+
+// v1.0 (Decision Intelligence).
+import { PrismaDecisionRecommendationRepository } from './infrastructure/persistence/prisma-decision-recommendation.repository.js';
+import { RootCauseAnalysisService } from './application/analytics/decision-intelligence/root-cause-analysis.service.js';
+import { ActionPlanBuilder } from './application/analytics/decision-intelligence/action-plan-builder.js';
+import { RecommendationEngineService } from './application/analytics/decision-intelligence/recommendation-engine.service.js';
+import { GenerateDecisionIntelligenceService } from './application/analytics/decision-intelligence/generate-decision-intelligence.service.js';
+import { GetDecisionIntelligenceUseCase } from './application/analytics/decision-intelligence/use-cases/get-decision-intelligence.use-case.js';
+
+// v1.0 (Executive Reporting).
+import { PrismaReportRepository } from './infrastructure/persistence/prisma-report.repository.js';
+import { GenerateReportUseCase } from './application/analytics/reporting/use-cases/generate-report.use-case.js';
+import { ListReportsUseCase } from './application/analytics/reporting/use-cases/list-reports.use-case.js';
+import { DownloadReportUseCase } from './application/analytics/reporting/use-cases/download-report.use-case.js';
+
 export interface Server {
   app: Express;
   prisma: PrismaClient;
@@ -209,6 +234,74 @@ export async function createServer(): Promise<Server> {
     metricCalculators,
   );
 
+  const mlFeatureSnapshotRepository = new PrismaMlFeatureSnapshotRepository(prisma);
+  const mlModelRepository = new PrismaMlModelRepository(prisma);
+  const predictionRepository = new PrismaPredictionRepository(prisma);
+  const mlServiceClient = new HttpMlServiceClient(env.ML_SERVICE_URL);
+  const featureStoreService = new FeatureStoreService();
+
+  const decisionRecommendationRepository = new PrismaDecisionRecommendationRepository(prisma);
+  const rootCauseAnalysisService = new RootCauseAnalysisService();
+  const actionPlanBuilder = new ActionPlanBuilder();
+  const recommendationEngineService = new RecommendationEngineService(actionPlanBuilder);
+  const generateDecisionIntelligenceService = new GenerateDecisionIntelligenceService(
+    insightRepository,
+    alertRepository,
+    predictionRepository,
+    decisionRecommendationRepository,
+    benchmarkEngineService,
+    rootCauseAnalysisService,
+    recommendationEngineService,
+    metricCalculators,
+  );
+
+  const getKpiSummary = new GetKpiSummaryUseCase(
+    resolveAnalyticsDataset,
+    customerAnalyticsService,
+    productAnalyticsService,
+    inventoryAnalyticsService,
+    kpiEngineService,
+    analyticsCache,
+  );
+
+  const getChurnPredictions = new GetChurnPredictionsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+  const getSalesForecast = new GetSalesForecastUseCase(
+    resolveAnalyticsDataset,
+    mlServiceClient,
+    mlModelRepository,
+    predictionRepository,
+  );
+  const getCustomerSegments = new GetCustomerSegmentsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+  const getProductRecommendations = new GetProductRecommendationsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+  const getDecisionIntelligence = new GetDecisionIntelligenceUseCase(
+    resolveAnalyticsDataset,
+    generateDecisionIntelligenceService,
+    decisionRecommendationRepository,
+  );
+
+  const reportRepository = new PrismaReportRepository(prisma);
+
   const app = createApp({
     corsOrigin: env.CORS_ORIGIN,
     routesDeps: {
@@ -276,14 +369,7 @@ export async function createServer(): Promise<Server> {
       },
       datasetUpload: createUploadMiddleware(maxUploadSizeBytes),
       analytics: {
-        getKpiSummary: new GetKpiSummaryUseCase(
-          resolveAnalyticsDataset,
-          customerAnalyticsService,
-          productAnalyticsService,
-          inventoryAnalyticsService,
-          kpiEngineService,
-          analyticsCache,
-        ),
+        getKpiSummary,
         getRevenueAnalytics: new GetRevenueAnalyticsUseCase(
           resolveAnalyticsDataset,
           customerAnalyticsService,
@@ -339,6 +425,32 @@ export async function createServer(): Promise<Server> {
         createBusinessRule: new CreateBusinessRuleUseCase(businessRuleRepository),
         updateBusinessRule: new UpdateBusinessRuleUseCase(businessRuleRepository),
         deleteBusinessRule: new DeleteBusinessRuleUseCase(businessRuleRepository),
+      },
+      predictions: {
+        getChurnPredictions,
+        getSalesForecast,
+        getCustomerSegments,
+        getProductRecommendations,
+      },
+      decisions: {
+        getDecisionIntelligence,
+      },
+      reports: {
+        generateReport: new GenerateReportUseCase(
+          resolveAnalyticsDataset,
+          getExecutiveDashboard,
+          getKpiSummary,
+          getChurnPredictions,
+          getSalesForecast,
+          getCustomerSegments,
+          getProductRecommendations,
+          getDecisionIntelligence,
+          reportGenerator,
+          fileStorage,
+          reportRepository,
+        ),
+        listReports: new ListReportsUseCase(reportRepository),
+        downloadReport: new DownloadReportUseCase(reportRepository, fileStorage),
       },
       tokenService,
       membershipRepository,

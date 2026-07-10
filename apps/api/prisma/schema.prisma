@@ -43,6 +43,9 @@ model User {
   // Sprint 3 (Analytics) back-relation.
   savedDashboardViews SavedDashboardView[]
 
+  // v1.0 (Executive Reporting) back-relation.
+  generatedReports Report[]
+
   @@map("users")
 }
 
@@ -67,6 +70,13 @@ model Organization {
   alerts        Alert[]
   businessRules BusinessRule[]
 
+  // v1.0 (Predictive & Decision Intelligence, Reporting) back-relations.
+  mlModels                MlModel[]
+  mlFeatureSnapshots      MlFeatureSnapshot[]
+  predictions             Prediction[]
+  decisionRecommendations DecisionRecommendation[]
+  reports                 Report[]
+
   @@map("organizations")
 }
 
@@ -90,15 +100,15 @@ model Membership {
 // One row per issued refresh token, enabling rotation and revocation. Access
 // tokens are intentionally NOT persisted — they're short-lived and stateless.
 model RefreshToken {
-  id         String    @id @default(cuid())
-  tokenHash  String    @unique
-  userId     String
-  expiresAt  DateTime
-  revokedAt  DateTime?
+  id                String    @id @default(cuid())
+  tokenHash         String    @unique
+  userId            String
+  expiresAt         DateTime
+  revokedAt         DateTime?
   // Points at the token that replaced this one, so a reused (already-rotated)
   // refresh token is detectable as a replay/theft signal.
   replacedByTokenId String?
-  createdAt  DateTime  @default(now())
+  createdAt         DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -179,24 +189,24 @@ model Dataset {
 // cleaning operation. `schema` records the detected column names/types so the
 // UI can render a preview table without re-parsing the source file.
 model DatasetVersion {
-  id                String       @id @default(cuid())
-  datasetId         String
-  versionNumber     Int
-  uploadedFileId     String?     @unique
-  rowCount          Int
-  columnCount       Int
-  schema            Json
-  qualityScore      Int?
-  validationReport  Json?
-  cleaningMode      CleaningMode @default(NONE)
-  cleaningLog       Json?
-  processingTimeMs  Int?
-  createdById       String
-  createdAt         DateTime     @default(now())
+  id               String       @id @default(cuid())
+  datasetId        String
+  versionNumber    Int
+  uploadedFileId   String?      @unique
+  rowCount         Int
+  columnCount      Int
+  schema           Json
+  qualityScore     Int?
+  validationReport Json?
+  cleaningMode     CleaningMode @default(NONE)
+  cleaningLog      Json?
+  processingTimeMs Int?
+  createdById      String
+  createdAt        DateTime     @default(now())
 
-  dataset      Dataset         @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  uploadedFile UploadedFile?   @relation(fields: [uploadedFileId], references: [id])
-  createdBy    User            @relation(fields: [createdById], references: [id])
+  dataset      Dataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  uploadedFile UploadedFile? @relation(fields: [uploadedFileId], references: [id])
+  createdBy    User          @relation(fields: [createdById], references: [id])
   rows         DatasetRow[]
   etlJobs      EtlJob[]
   featureSets  FeatureSet[]
@@ -494,4 +504,167 @@ model BusinessRule {
 
   @@index([organizationId, metricKey])
   @@map("business_rules")
+}
+
+// v1.0 — Predictive Intelligence (Module 1).
+enum MlModelKey {
+  CHURN
+  FORECAST
+  SEGMENTATION
+  RECOMMENDATION
+}
+
+// One trained artifact instance, scoped to the exact dataset version it was
+// trained on — the same "generate once per immutable DatasetVersion, reuse
+// after" pattern as Insight/Alert generation (see docs/ARCHITECTURE.md).
+// Training happens on demand the first time a prediction is requested for a
+// given (organizationId, datasetVersionId, modelKey); later requests for the
+// same dataset version load the persisted artifact instead of retraining.
+model MlModel {
+  id               String     @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  modelKey         MlModelKey
+  version          Int
+  algorithm        String
+  // Training metrics (e.g. accuracy, silhouette score) — shape varies per
+  // model type, so JSON rather than fixed columns, same reasoning as
+  // Insight.metadata.
+  metricsJson      Json
+  // Path to the joblib-serialized artifact under the ML service's model
+  // store volume — mirrors how LocalFileStorage tracks uploaded files by
+  // path rather than storing bytes in Postgres.
+  artifactPath     String
+  isActive         Boolean    @default(true)
+  trainedAt        DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, datasetVersionId, modelKey])
+  @@index([organizationId, datasetVersionId])
+  @@map("ml_models")
+}
+
+// The Feature Store: reproducible, inspectable feature vectors per entity,
+// built once per dataset version from the same AnalyticsColumns/row-metrics
+// helpers every other analytics service uses (see metric-calculators.ts) —
+// not a second definition of "what is this customer's total spend."
+model MlFeatureSnapshot {
+  id               String   @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  // "CUSTOMER" | "PRODUCT" — which kind of entity these features describe.
+  entityType       String
+  entityId         String
+  featuresJson     Json
+  computedAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, datasetVersionId, entityType, entityId])
+  @@index([organizationId, datasetVersionId, entityType])
+  @@map("ml_feature_snapshots")
+}
+
+// A persisted prediction result. targetType/targetId identify what the
+// prediction is about (a customer for churn/segmentation, a product for
+// recommendations, null for a dataset-wide forecast) — kept as plain strings
+// rather than a formal relation since the target may be a customerId that
+// only exists inside DatasetRow's JSONB, not a first-class table.
+model Prediction {
+  id               String     @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  modelKey         MlModelKey
+  modelVersion     Int
+  targetType       String?
+  targetId         String?
+  valueJson        Json
+  confidence       Float
+  // Feature-importance explanation for this specific prediction — see
+  // Module 1's explainability decision (native importances, not SHAP).
+  explanationJson  Json
+  createdAt        DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, datasetVersionId, modelKey])
+  @@map("predictions")
+}
+
+// v1.0 — Decision Intelligence (Module 2).
+enum DecisionCategory {
+  ROOT_CAUSE
+  RECOMMENDATION
+}
+
+enum RecommendationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Deterministic output of the Decision Intelligence Engine — every row here
+// traces back to concrete Insight/Alert/Benchmark/Prediction inputs recorded
+// in sourceRefsJson, never to freeform generation (no LLM is used anywhere
+// in this engine, per its explicit requirement).
+model DecisionRecommendation {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  datasetVersionId   String
+  category           DecisionCategory
+  title              String
+  rootCause          String?
+  recommendationText String?
+  roiEstimate        Float?
+  impactScore        Float
+  priority           RecommendationPriority
+  actionPlanJson     Json?
+  sourceRefsJson     Json
+  createdAt          DateTime               @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Generation is table-driven (same root cause/alert/prediction always
+  // yields the same title for a given dataset version), so this constraint
+  // plus createMany(skipDuplicates) is the DB-level guard against duplicate
+  // generation — no in-process lock needed (contrast with Sprint 4's
+  // original GenerateIntelligenceService lock, retrofitted in Module 5).
+  // `category` is part of the key, not just `title`: a root cause and its
+  // corresponding recommendation can legitimately share similar wording
+  // (e.g. both about "Revenue declined") without one silently shadowing
+  // the other under skipDuplicates.
+  @@unique([organizationId, datasetVersionId, category, title])
+  @@index([organizationId, createdAt])
+  @@index([datasetVersionId])
+  @@map("decision_recommendations")
+}
+
+// v1.0 — Executive Reporting (Module 3).
+enum ReportType {
+  EXECUTIVE_SUMMARY
+  KPI
+  PREDICTION
+  RECOMMENDATION
+}
+
+// One row per generated PDF — the "Report History" / "Download Center" is
+// just this table plus LocalFileStorage, the same split already used for
+// uploaded datasets (metadata in Postgres, bytes on disk by path).
+model Report {
+  id               String     @id @default(cuid())
+  organizationId   String
+  datasetVersionId String
+  type             ReportType
+  fileName         String
+  storagePath      String
+  generatedById    String
+  generatedAt      DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  generatedBy  User         @relation(fields: [generatedById], references: [id])
+
+  @@index([organizationId, generatedAt])
+  @@map("reports")
 }

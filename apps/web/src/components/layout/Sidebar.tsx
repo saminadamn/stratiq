@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/analytics/customers', label: 'Customers', end: false },
   { to: '/analytics/products', label: 'Products', end: false },
   { to: '/analytics/inventory', label: 'Inventory', end: false },
+  { to: '/reports', label: 'Reports', end: false },
 ];
 
 export function Sidebar(): JSX.Element {

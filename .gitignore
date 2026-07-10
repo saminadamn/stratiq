@@ -31,3 +31,12 @@ coverage/
 # Uploaded dataset files (Sprint 2 local dev storage)
 apps/api/storage/*
 !apps/api/storage/.gitkeep
+
+# Python (ml-service)
+apps/ml-service/.venv/
+apps/ml-service/__pycache__/
+apps/ml-service/**/__pycache__/
+apps/ml-service/.pytest_cache/
+apps/ml-service/model_store/*
+!apps/ml-service/model_store/.gitkeep
+apps/ml-service/.coverage

@@ -78,12 +78,14 @@ describe('GenerateIntelligenceService', () => {
       create: createInsight,
       countByDatasetVersion,
       listByOrganization: vi.fn(),
+      findByDatasetVersion: vi.fn(),
     };
     const alerts: AlertRepository = {
       create: vi.fn(),
       listByOrganization: vi.fn(),
       findByOrganizationAndId: vi.fn(),
       updateStatus: vi.fn(),
+      findByDatasetVersion: vi.fn(),
     };
     const insightEngine: InsightEngineService = {
       generate: vi.fn().mockReturnValue([oneInsight]),

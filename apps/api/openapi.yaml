@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: StratIQ API
-  version: 0.4.0
+  version: 1.0.0
   description: |
     Sprint 2 adds the Data Management & ETL Foundation: dataset upload
     (CSV/Excel), validation, cleaning, versioning, feature engineering, and
@@ -10,10 +10,12 @@ info:
     filter views, and CSV/PDF export. Sprint 4 adds the Analytics
     Intelligence Layer: the Metrics Registry, deterministic Trend Detection,
     Benchmark comparisons (MoM/QoQ/YoY), a configurable Business Rules
-    Engine, and the Insight/Alert Timeline generated from them. Auth/
-    organization endpoints from Sprint 1 are omitted here since this
-    document focuses on what Sprints 2-4 added — see docs/ARCHITECTURE.md
-    for the full picture.
+    Engine, and the Insight/Alert Timeline generated from them. v1.0 adds
+    Predictive Intelligence (churn, forecasting, segmentation, product
+    recommendations via an internal ML service). Auth/organization endpoints
+    from Sprint 1 are omitted here since this document focuses on what
+    Sprints 2-4 and v1.0 added — see docs/ARCHITECTURE.md for the full
+    picture.
 servers:
   - url: http://localhost:4000/api/v1
 security:
@@ -719,6 +721,178 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /organizations/{organizationId}/analytics/predictions/churn:
+    get:
+      summary: Customer churn risk predictions
+      description: |
+        Delegates to the internal ML service (see docs/ARCHITECTURE.md).
+        Generated once per dataset version and reused afterward, same as
+        Insights/Alerts; pass forceRefresh=true to retrain.
+      tags: [Predictions]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - $ref: '#/components/parameters/forceRefresh'
+      responses:
+        '200':
+          description: Churn predictions, one per customer with an identifiable customerId column.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items: { $ref: '#/components/schemas/ChurnPrediction' }
+
+  /organizations/{organizationId}/analytics/predictions/forecast:
+    get:
+      summary: Sales forecast for the next few periods
+      tags: [Predictions]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - $ref: '#/components/parameters/forceRefresh'
+      responses:
+        '200':
+          description: Historical revenue series plus forecasted periods. Null if the dataset has no date column.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesForecast'
+
+  /organizations/{organizationId}/analytics/predictions/segments:
+    get:
+      summary: Customer segments (K-Means over RFM features)
+      tags: [Predictions]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - $ref: '#/components/parameters/forceRefresh'
+      responses:
+        '200':
+          description: Segment summaries plus each customer's segment assignment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerSegmentation'
+
+  /organizations/{organizationId}/analytics/predictions/recommendations:
+    get:
+      summary: Product recommendations (popularity + category-affinity hybrid)
+      tags: [Predictions]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - $ref: '#/components/parameters/forceRefresh'
+      responses:
+        '200':
+          description: Up to 3 recommended products per customer, excluding products they've already bought.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recommendations:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductRecommendation' }
+
+  /organizations/{organizationId}/analytics/decisions:
+    get:
+      summary: Root Cause Analysis and Executive Recommendations
+      description: |
+        The Decision Intelligence Engine — deterministic and rule-based, no
+        LLM. Composes existing Insights, Alerts, Benchmarks, and Predictions
+        (see docs/ARCHITECTURE.md) into root-cause explanations and
+        prioritized, ROI-estimated recommendations with 30/60/90-day action
+        plans. Generated once per dataset version and reused afterward.
+      tags: [Decisions]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - $ref: '#/components/parameters/analyticsDatasetId'
+        - $ref: '#/components/parameters/forceRefresh'
+      responses:
+        '200':
+          description: Root causes and recommendations for the resolved dataset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rootCauses:
+                    type: array
+                    items: { $ref: '#/components/schemas/DecisionRecommendation' }
+                  recommendations:
+                    type: array
+                    items: { $ref: '#/components/schemas/DecisionRecommendation' }
+
+  /organizations/{organizationId}/reports/generate:
+    post:
+      summary: Generate a PDF report
+      description: |
+        Composes existing dashboard/prediction/decision data into a PDF —
+        no new data-fetching logic (see docs/ARCHITECTURE.md's Module 3
+        decisions). Charts are drawn as native PDFKit vector primitives.
+      tags: [Reports]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [EXECUTIVE_SUMMARY, KPI, PREDICTION, RECOMMENDATION]
+                datasetId: { type: string }
+      responses:
+        '201':
+          description: Report generated and saved to the Download Center.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+
+  /organizations/{organizationId}/reports:
+    get:
+      summary: Report History
+      tags: [Reports]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+      responses:
+        '200':
+          description: Every report generated for this organization, most recent first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items: { $ref: '#/components/schemas/Report' }
+
+  /organizations/{organizationId}/reports/{reportId}/download:
+    get:
+      summary: Download a previously generated report (Download Center)
+      tags: [Reports]
+      parameters:
+        - $ref: '#/components/parameters/organizationId'
+        - name: reportId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The PDF file.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -792,6 +966,11 @@ components:
       in: path
       required: true
       schema: { type: string }
+    forceRefresh:
+      name: forceRefresh
+      in: query
+      description: Retrain instead of reusing the cached prediction for this dataset version.
+      schema: { type: string, enum: ['true', 'false'], default: 'false' }
 
   responses:
     BadRequest:
@@ -1337,3 +1516,121 @@ components:
         thresholdValue: { type: number }
         severity: { type: string, enum: [INFORMATIONAL, WARNING, CRITICAL] }
         isActive: { type: boolean }
+
+    FeatureImportance:
+      type: object
+      properties:
+        feature: { type: string }
+        importance: { type: number }
+
+    PredictionExplanation:
+      type: object
+      description: Native feature-importance explanation (see docs/ARCHITECTURE.md — SHAP was deliberately not used).
+      properties:
+        method: { type: string }
+        topFeatures:
+          type: array
+          items: { $ref: '#/components/schemas/FeatureImportance' }
+
+    ChurnPrediction:
+      type: object
+      properties:
+        customerId: { type: string }
+        customerName: { type: string, nullable: true }
+        churnProbability: { type: number, minimum: 0, maximum: 1 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        explanation: { $ref: '#/components/schemas/PredictionExplanation' }
+
+    SalesForecastPoint:
+      type: object
+      properties:
+        period: { type: string }
+        value: { type: number }
+        isForecast: { type: boolean }
+
+    SalesForecast:
+      type: object
+      nullable: true
+      properties:
+        modelVersion: { type: integer }
+        confidence: { type: number }
+        history:
+          type: array
+          items: { $ref: '#/components/schemas/TimeSeriesPoint' }
+        forecast:
+          type: array
+          items: { $ref: '#/components/schemas/SalesForecastPoint' }
+        explanation: { $ref: '#/components/schemas/PredictionExplanation' }
+
+    CustomerSegment:
+      type: object
+      properties:
+        segmentId: { type: integer }
+        label: { type: string }
+        customerCount: { type: integer }
+        averageSpend: { type: number }
+        averageOrders: { type: number }
+
+    CustomerSegmentation:
+      type: object
+      nullable: true
+      properties:
+        modelVersion: { type: integer }
+        segments:
+          type: array
+          items: { $ref: '#/components/schemas/CustomerSegment' }
+        assignments:
+          type: array
+          items:
+            type: object
+            properties:
+              customerId: { type: string }
+              segmentId: { type: integer }
+
+    ProductRecommendation:
+      type: object
+      properties:
+        customerId: { type: string }
+        recommendedProductId: { type: string }
+        recommendedProductName: { type: string, nullable: true }
+        score: { type: number }
+        reason: { type: string }
+
+    ActionPlanItem:
+      type: object
+      properties:
+        day: { type: integer, enum: [30, 60, 90] }
+        action: { type: string }
+
+    DecisionRecommendation:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string, enum: [ROOT_CAUSE, RECOMMENDATION] }
+        title: { type: string }
+        rootCause: { type: string, nullable: true }
+        recommendationText: { type: string, nullable: true }
+        roiEstimate:
+          type: number
+          nullable: true
+          description: Estimated dollar impact of acting on this recommendation — a documented fixed-multiplier assumption, not a fitted forecast.
+        impactScore: { type: number, description: 0-100 relative severity/impact score. }
+        priority: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL] }
+        actionPlan:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ActionPlanItem' }
+        createdAt: { type: string, format: date-time }
+
+    Report:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [EXECUTIVE_SUMMARY, KPI, PREDICTION, RECOMMENDATION] }
+        fileName: { type: string }
+        generatedAt: { type: string, format: date-time }
+        generatedBy:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }

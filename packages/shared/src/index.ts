@@ -6,3 +6,6 @@ export * from './types/api.js';
 export * from './types/dataset.js';
 export * from './types/analytics.js';
 export * from './types/intelligence.js';
+export * from './types/predictions.js';
+export * from './types/decisions.js';
+export * from './types/reports.js';

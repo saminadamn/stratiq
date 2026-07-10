@@ -15,6 +15,9 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/generated/**',
       '**/coverage/**',
+      // Python project — its own tooling lints it, not ESLint. Excluded as a
+      // whole tree (not just .venv) since it's never a JS/TS workspace.
+      'apps/ml-service/**',
     ],
   },
   js.configs.recommended,

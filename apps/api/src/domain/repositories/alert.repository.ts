@@ -17,4 +17,7 @@ export interface AlertRepository {
   listByOrganization(organizationId: string, status?: AlertStatus): Promise<Alert[]>;
   findByOrganizationAndId(organizationId: string, id: string): Promise<Alert | null>;
   updateStatus(id: string, status: AlertStatus, resolvedAt?: Date): Promise<Alert>;
+  // v1.0: the Decision Intelligence Engine needs this dataset version's own
+  // alerts specifically (see InsightRepository.findByDatasetVersion).
+  findByDatasetVersion(datasetVersionId: string): Promise<Alert[]>;
 }

@@ -17,7 +17,10 @@ import { round2 } from './rounding.js';
 
 type Row = Record<string, unknown>;
 
-interface ProductAggregate {
+// Exported so the v1.0 Feature Store (feature-store.service.ts) can build
+// product-level ML features from the same per-product aggregate, instead of
+// re-deriving "what is a product's revenue/units sold" a second time.
+export interface ProductAggregate {
   productId: string;
   productName: string;
   category: string | null;
@@ -30,7 +33,7 @@ interface ProductAggregate {
 const BEST_WORST_LIMIT = 10;
 const CONTRIBUTION_TOP_N = 8;
 
-function buildProductAggregates(
+export function buildProductAggregates(
   rows: Row[],
   columns: AnalyticsColumns,
 ): Map<string, ProductAggregate> {

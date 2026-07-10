@@ -36,6 +36,11 @@ const InventoryDashboardPage = lazy(() =>
     default: m.InventoryDashboardPage,
   })),
 );
+// v1.0: same code-splitting rationale as the dashboards above — the Reports
+// page isn't needed on first load either.
+const ReportsPage = lazy(() =>
+  import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })),
+);
 
 function AnalyticsPageFallback(): JSX.Element {
   return <p className="text-sm text-slate-500">Loading dashboard…</p>;
@@ -85,6 +90,14 @@ export default function App(): JSX.Element {
                 element={
                   <Suspense fallback={<AnalyticsPageFallback />}>
                     <InventoryDashboardPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/reports"
+                element={
+                  <Suspense fallback={<AnalyticsPageFallback />}>
+                    <ReportsPage />
                   </Suspense>
                 }
               />

@@ -3,13 +3,19 @@ import type multer from 'multer';
 import { createAnalyticsRoutes } from './analytics.routes.js';
 import { createAuthRoutes } from './auth.routes.js';
 import { createDatasetRoutes } from './dataset.routes.js';
+import { createDecisionsRoutes } from './decisions.routes.js';
 import { createIntelligenceRoutes } from './intelligence.routes.js';
 import { createOrganizationRoutes } from './organization.routes.js';
+import { createPredictionsRoutes } from './predictions.routes.js';
+import { createReportsRoutes } from './reports.routes.js';
 import type { AnalyticsControllerDeps } from '../controllers/analytics.controller.js';
 import type { AuthControllerDeps } from '../controllers/auth.controller.js';
 import type { DatasetControllerDeps } from '../controllers/dataset.controller.js';
+import type { DecisionsControllerDeps } from '../controllers/decisions.controller.js';
 import type { IntelligenceControllerDeps } from '../controllers/intelligence.controller.js';
 import type { OrganizationControllerDeps } from '../controllers/organization.controller.js';
+import type { PredictionsControllerDeps } from '../controllers/predictions.controller.js';
+import type { ReportsControllerDeps } from '../controllers/reports.controller.js';
 import type { TokenService } from '../../../application/ports/token-service.port.js';
 import type { MembershipRepository } from '../../../domain/repositories/membership.repository.js';
 
@@ -23,6 +29,12 @@ export interface ApiRoutesDeps {
   analytics: AnalyticsControllerDeps;
   // Sprint 4 (Analytics Intelligence Layer).
   intelligence: IntelligenceControllerDeps;
+  // v1.0 (Predictive Intelligence).
+  predictions: PredictionsControllerDeps;
+  // v1.0 (Decision Intelligence).
+  decisions: DecisionsControllerDeps;
+  // v1.0 (Executive Reporting).
+  reports: ReportsControllerDeps;
   tokenService: TokenService;
   membershipRepository: MembershipRepository;
 }
@@ -59,6 +71,21 @@ export function createApiRouter(deps: ApiRoutesDeps): Router {
   router.use(
     '/organizations/:organizationId/analytics',
     createIntelligenceRoutes(deps.intelligence, deps.tokenService, deps.membershipRepository),
+  );
+  // Third router, same prefix again — see predictions.routes.ts.
+  router.use(
+    '/organizations/:organizationId/analytics',
+    createPredictionsRoutes(deps.predictions, deps.tokenService, deps.membershipRepository),
+  );
+  // Fourth router, same prefix again — see decisions.routes.ts.
+  router.use(
+    '/organizations/:organizationId/analytics',
+    createDecisionsRoutes(deps.decisions, deps.tokenService, deps.membershipRepository),
+  );
+  // Own path, not nested under /analytics — see reports.routes.ts.
+  router.use(
+    '/organizations/:organizationId/reports',
+    createReportsRoutes(deps.reports, deps.tokenService, deps.membershipRepository),
   );
   return router;
 }
