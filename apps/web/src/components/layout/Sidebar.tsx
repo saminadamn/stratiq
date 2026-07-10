@@ -2,15 +2,6 @@ import type { SVGProps } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../auth/auth-context';
 
-function IconHome(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} {...props}>
-      <path d="M3 9.5 10 4l7 5.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 8.5V16a1 1 0 0 0 1 1h3v-4.5h2V17h3a1 1 0 0 0 1-1V8.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function IconDatabase(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} {...props}>
@@ -62,77 +53,103 @@ function IconDocument(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+// No separate "Dashboard" entry pointing at "/" — the Executive dashboard
+// *is* the main dashboard (see App.tsx, which redirects "/" straight here),
+// so a distinct placeholder landing page would just be a second, emptier
+// copy of this same destination.
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', end: true, icon: IconHome },
-  { to: '/datasets', label: 'Datasets', end: false, icon: IconDatabase },
   { to: '/analytics/executive', label: 'Executive', end: false, icon: IconChart },
+  { to: '/datasets', label: 'Datasets', end: false, icon: IconDatabase },
   { to: '/analytics/customers', label: 'Customers', end: false, icon: IconUsers },
   { to: '/analytics/products', label: 'Products', end: false, icon: IconBox },
   { to: '/analytics/inventory', label: 'Inventory', end: false, icon: IconBox },
   { to: '/reports', label: 'Reports', end: false, icon: IconDocument },
 ];
 
-export function Sidebar(): JSX.Element {
+interface SidebarProps {
+  // Mobile-only: the sidebar is always visible inline on large screens
+  // (lg: and up) regardless of these props — see DashboardLayout.tsx.
+  isMobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps): JSX.Element {
   const { organizations } = useAuth();
   const primaryOrganization = organizations[0];
 
   return (
-    <aside className="flex w-64 flex-shrink-0 flex-col border-r border-slate-200/80 bg-white">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-          S
+    <>
+      {/* Backdrop: mobile-only, closes the sidebar on tap outside it. */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-shrink-0 flex-col border-r border-slate-200/80 bg-white transition-transform duration-200 ease-out lg:static lg:z-auto lg:translate-x-0 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 px-5 py-5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+            S
+          </div>
+          <span className="text-base font-semibold tracking-tight text-slate-900">StratIQ</span>
         </div>
-        <span className="text-base font-semibold tracking-tight text-slate-900">StratIQ</span>
-      </div>
 
-      <nav className="flex-1 space-y-0.5 px-3">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600" />
-                  )}
-                  <Icon
-                    className={`h-[18px] w-[18px] flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-500'}`}
-                  />
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          );
-        })}
-      </nav>
+        <nav className="flex-1 space-y-0.5 px-3">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={onMobileClose}
+                className={({ isActive }) =>
+                  `group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600" />
+                    )}
+                    <Icon
+                      className={`h-[18px] w-[18px] flex-shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-500'}`}
+                    />
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
 
-      {primaryOrganization && (
-        <div className="border-t border-slate-200/80 px-3 py-4">
-          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Workspace
-          </p>
-          <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-              {primaryOrganization.name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-slate-700">{primaryOrganization.name}</p>
-              <p className="text-xs text-slate-400">{primaryOrganization.role}</p>
+        {primaryOrganization && (
+          <div className="border-t border-slate-200/80 px-3 py-4">
+            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </p>
+            <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                {primaryOrganization.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-700">{primaryOrganization.name}</p>
+                <p className="text-xs text-slate-400">{primaryOrganization.role}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </aside>
+        )}
+      </aside>
+    </>
   );
 }

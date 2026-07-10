@@ -20,11 +20,20 @@ import { PredictionsPanel } from '../../components/analytics/PredictionsPanel';
 import { SavedViewsMenu } from '../../components/analytics/SavedViewsMenu';
 import { TrendIndicator } from '../../components/analytics/TrendIndicator';
 
+type ViewMode = 'EXECUTIVE' | 'MANAGER' | 'ANALYST';
+
+const VIEW_MODES: Array<{ mode: ViewMode; label: string; description: string }> = [
+  { mode: 'EXECUTIVE', label: 'Executive', description: 'Headline KPIs and strategic recommendations only' },
+  { mode: 'MANAGER', label: 'Manager', description: 'Operational detail — orders, stock, alerts' },
+  { mode: 'ANALYST', label: 'Analyst', description: 'Everything, full detail' },
+];
+
 export function ExecutiveDashboardPage(): JSX.Element {
   const { organizations } = useAuth();
   const organizationId = organizations[0]?.id;
 
   const [filters, setFilters] = useState<AnalyticsFiltersDto>({});
+  const [viewMode, setViewMode] = useState<ViewMode>('EXECUTIVE');
   const [dashboard, setDashboard] = useState<ExecutiveDashboardDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revenueTrend, setRevenueTrend] = useState<TrendAnalysisDto | null>(null);
@@ -69,15 +78,41 @@ export function ExecutiveDashboardPage(): JSX.Element {
   }
 
   const isLoading = !dashboard;
+  const isManager = viewMode === 'MANAGER';
+  const isAnalyst = viewMode === 'ANALYST';
+  // Operational detail (stock, per-order granularity) matters to
+  // Manager/Analyst but is noise for a strategic Executive view; the
+  // Decision Intelligence panel already turns the same underlying data into
+  // an executive-level recommendation, so nothing is lost, just re-leveled.
+  const showOperationalDetail = isManager || isAnalyst;
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">Executive Overview</h1>
-          <p className="text-sm text-slate-500">How is the business performing today?</p>
+          <p className="text-sm text-slate-500">
+            {VIEW_MODES.find((v) => v.mode === viewMode)?.description}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {VIEW_MODES.map((option) => (
+              <button
+                key={option.mode}
+                type="button"
+                onClick={() => setViewMode(option.mode)}
+                aria-pressed={viewMode === option.mode}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === option.mode
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <SavedViewsMenu dashboardType="EXECUTIVE" currentFilters={filters} onApply={setFilters} />
           <ExportMenu dashboardType="EXECUTIVE" filters={filters} pngTargetRef={contentRef} />
         </div>
@@ -108,7 +143,6 @@ export function ExecutiveDashboardPage(): JSX.Element {
             label="Gross Profit"
             value={formatCurrency(dashboard?.kpis.grossProfit ?? null)}
           />
-          <KpiCard label="Orders" value={formatNumber(dashboard?.kpis.totalOrders ?? null)} />
           <KpiCard
             label="Growth (MoM)"
             value={formatPercent(dashboard?.kpis.monthlyGrowthRate ?? null)}
@@ -117,19 +151,24 @@ export function ExecutiveDashboardPage(): JSX.Element {
             label="Active Customers"
             value={formatNumber(dashboard?.kpis.activeCustomers ?? null)}
           />
-          <KpiCard
-            label="Inventory Status"
-            value={
-              dashboard?.inventoryStatus
-                ? `${dashboard.inventoryStatus.lowStockCount}/${dashboard.inventoryStatus.totalSkus} low`
-                : '—'
-            }
-          />
-          <KpiCard label="Top Product" value={dashboard?.topProduct?.productName ?? '—'} />
-          <KpiCard
-            label="Low Stock Alerts"
-            value={formatNumber(dashboard?.lowStockAlerts.length ?? null)}
-          />
+          {showOperationalDetail && (
+            <>
+              <KpiCard label="Orders" value={formatNumber(dashboard?.kpis.totalOrders ?? null)} />
+              <KpiCard
+                label="Inventory Status"
+                value={
+                  dashboard?.inventoryStatus
+                    ? `${dashboard.inventoryStatus.lowStockCount}/${dashboard.inventoryStatus.totalSkus} low`
+                    : '—'
+                }
+              />
+              <KpiCard label="Top Product" value={dashboard?.topProduct?.productName ?? '—'} />
+              <KpiCard
+                label="Low Stock Alerts"
+                value={formatNumber(dashboard?.lowStockAlerts.length ?? null)}
+              />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -140,13 +179,15 @@ export function ExecutiveDashboardPage(): JSX.Element {
           >
             <LineTrendChart data={dashboard?.monthlyRevenueTrend ?? []} />
           </ChartCard>
-          <ChartCard
-            title="Orders Over Time"
-            isLoading={isLoading}
-            isEmpty={dashboard?.ordersOverTime.length === 0}
-          >
-            <LineTrendChart data={dashboard?.ordersOverTime ?? []} />
-          </ChartCard>
+          {showOperationalDetail && (
+            <ChartCard
+              title="Orders Over Time"
+              isLoading={isLoading}
+              isEmpty={dashboard?.ordersOverTime.length === 0}
+            >
+              <LineTrendChart data={dashboard?.ordersOverTime ?? []} />
+            </ChartCard>
+          )}
           <ChartCard
             title="Revenue by Category"
             isLoading={isLoading}
@@ -154,16 +195,18 @@ export function ExecutiveDashboardPage(): JSX.Element {
           >
             <BarCategoryChart data={dashboard?.revenueByCategory ?? []} />
           </ChartCard>
-          <ChartCard
-            title="Revenue by Region"
-            isLoading={isLoading}
-            isEmpty={dashboard?.revenueByRegion.length === 0}
-          >
-            <PieBreakdownChart data={dashboard?.revenueByRegion ?? []} />
-          </ChartCard>
+          {showOperationalDetail && (
+            <ChartCard
+              title="Revenue by Region"
+              isLoading={isLoading}
+              isEmpty={dashboard?.revenueByRegion.length === 0}
+            >
+              <PieBreakdownChart data={dashboard?.revenueByRegion ?? []} />
+            </ChartCard>
+          )}
         </div>
 
-        {dashboard && dashboard.lowStockAlerts.length > 0 && (
+        {showOperationalDetail && dashboard && dashboard.lowStockAlerts.length > 0 && (
           <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
             <h3 className="mb-2 text-sm font-semibold text-amber-900">Low Stock Alerts</h3>
             <ul className="space-y-1 text-sm text-amber-800">
@@ -192,10 +235,12 @@ export function ExecutiveDashboardPage(): JSX.Element {
           />
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <InsightsPanel organizationId={organizationId} />
-          <AlertsPanel organizationId={organizationId} />
-        </div>
+        {showOperationalDetail && (
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <InsightsPanel organizationId={organizationId} />
+            <AlertsPanel organizationId={organizationId} />
+          </div>
+        )}
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <PredictionsPanel organizationId={organizationId} />

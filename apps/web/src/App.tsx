@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/auth-context';
 import { ProtectedRoute } from './auth/protected-route';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { CleaningWizardPage } from './pages/datasets/CleaningWizardPage';
@@ -56,7 +55,11 @@ export default function App(): JSX.Element {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
-              <Route path="/" element={<DashboardPage />} />
+              {/* The Executive dashboard is the real "main dashboard" — no
+                  separate placeholder landing page, just redirect straight
+                  there (see Sidebar.tsx, which no longer has a distinct
+                  "Dashboard" nav item pointing anywhere else). */}
+              <Route path="/" element={<Navigate to="/analytics/executive" replace />} />
               <Route path="/datasets" element={<DatasetsListPage />} />
               <Route path="/datasets/upload" element={<UploadDatasetPage />} />
               <Route path="/datasets/:datasetId" element={<DatasetDetailPage />} />
