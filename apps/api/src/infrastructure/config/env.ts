@@ -14,7 +14,12 @@ const PLACEHOLDER_SECRETS = new Set([
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    // Most PaaS hosts (Render, Railway, Heroku) assign a port dynamically and
+    // inject it as `PORT`, which always wins over API_PORT when both are set
+    // — see the coercion below. API_PORT alone still works for local/Docker
+    // setups that don't have that convention.
     API_PORT: z.coerce.number().int().positive().default(4000),
+    PORT: z.coerce.number().int().positive().optional(),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_ACCESS_TTL: z.string().default('15m'),
@@ -64,5 +69,9 @@ export function loadEnv(): Env {
     );
     throw new Error(`Invalid environment configuration:\n${issues.join('\n')}`);
   }
-  return parsed.data;
+  const env = parsed.data;
+  if (env.PORT !== undefined) {
+    env.API_PORT = env.PORT;
+  }
+  return env;
 }
