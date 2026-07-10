@@ -27,7 +27,10 @@ export class GetChurnPredictionsUseCase {
     const context = await this.resolveDataset.resolve(organizationId, datasetId);
 
     if (!forceRefresh) {
-      const existing = await this.predictions.findByDatasetVersion(context.datasetVersionId, 'CHURN');
+      const existing = await this.predictions.findByDatasetVersion(
+        context.datasetVersionId,
+        'CHURN',
+      );
       if (existing.length > 0) {
         return existing.map((prediction) => ({
           customerId: prediction.targetId as string,

@@ -103,7 +103,9 @@ describe('v1.0 Predictions/Decisions/Reports API (integration)', () => {
       .expect(200);
     expect(second.body.predictions).toEqual(first.body.predictions);
 
-    const models = await server.prisma.mlModel.findMany({ where: { organizationId, modelKey: 'CHURN' } });
+    const models = await server.prisma.mlModel.findMany({
+      where: { organizationId, modelKey: 'CHURN' },
+    });
     expect(models).toHaveLength(1);
   });
 
@@ -139,9 +141,11 @@ describe('v1.0 Predictions/Decisions/Reports API (integration)', () => {
       (r: { customerId: string }) => r.customerId === 'C1',
     );
     // C1 already bought P1 and P2 — should never be recommended either.
-    expect(c1Recommendations.every((r: { recommendedProductId: string }) => r.recommendedProductId === 'P3')).toBe(
-      true,
-    );
+    expect(
+      c1Recommendations.every(
+        (r: { recommendedProductId: string }) => r.recommendedProductId === 'P3',
+      ),
+    ).toBe(true);
   });
 
   it('serves deterministic root causes and recommendations from the Decision Intelligence Engine', async () => {

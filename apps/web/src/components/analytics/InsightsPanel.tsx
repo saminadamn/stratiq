@@ -28,7 +28,8 @@ export function InsightsPanel({ organizationId }: InsightsPanelProps): JSX.Eleme
         if (!cancelled) setInsights(result);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Unable to load insights.');
+        if (!cancelled)
+          setError(err instanceof ApiError ? err.message : 'Unable to load insights.');
       });
     return () => {
       cancelled = true;

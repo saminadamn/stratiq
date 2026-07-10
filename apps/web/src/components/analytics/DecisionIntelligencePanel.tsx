@@ -19,7 +19,9 @@ const PRIORITY_STYLE: Record<RecommendationPriority, string> = {
 // metrics moved, and recommendations with an expandable 30/60/90-day plan.
 // Deterministic and rule-based end to end (see docs/ARCHITECTURE.md) — no
 // text here is model-generated.
-export function DecisionIntelligencePanel({ organizationId }: DecisionIntelligencePanelProps): JSX.Element {
+export function DecisionIntelligencePanel({
+  organizationId,
+}: DecisionIntelligencePanelProps): JSX.Element {
   const [rootCauses, setRootCauses] = useState<DecisionRecommendationDto[] | null>(null);
   const [recommendations, setRecommendations] = useState<DecisionRecommendationDto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,8 @@ export function DecisionIntelligencePanel({ organizationId }: DecisionIntelligen
         setRecommendations(result.recommendations);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Unable to load recommendations.');
+        if (!cancelled)
+          setError(err instanceof ApiError ? err.message : 'Unable to load recommendations.');
       });
     return () => {
       cancelled = true;
@@ -58,7 +61,9 @@ export function DecisionIntelligencePanel({ organizationId }: DecisionIntelligen
         <div className="space-y-4">
           {rootCauses && rootCauses.length > 0 && (
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Root Causes</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Root Causes
+              </p>
               <ul className="mt-1 space-y-1 text-sm text-slate-700">
                 {rootCauses.map((cause) => (
                   <li key={cause.id}>{cause.rootCause}</li>
@@ -78,7 +83,10 @@ export function DecisionIntelligencePanel({ organizationId }: DecisionIntelligen
                 {sortedRecommendations.map((recommendation) => {
                   const isExpanded = expandedId === recommendation.id;
                   return (
-                    <li key={recommendation.id} className="rounded-md border border-slate-200 p-3 text-sm">
+                    <li
+                      key={recommendation.id}
+                      className="rounded-md border border-slate-200 p-3 text-sm"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium text-slate-900">{recommendation.title}</p>

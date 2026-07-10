@@ -1,7 +1,11 @@
 import type { ChurnPredictionDto, RecommendationPriority } from '@stratiq/shared';
 import type { Alert } from '../../../domain/entities/alert.entity.js';
 import type { BenchmarkResult } from '../intelligence/benchmark-engine.service.js';
-import type { ActionPlanBuilder, ActionPlanCategory, ActionPlanItem } from './action-plan-builder.js';
+import type {
+  ActionPlanBuilder,
+  ActionPlanCategory,
+  ActionPlanItem,
+} from './action-plan-builder.js';
 import type { RootCause } from './root-cause-analysis.service.js';
 
 export interface GeneratedRecommendation {
@@ -82,7 +86,8 @@ export class RecommendationEngineService {
 
     const roiEstimate =
       averageCustomerValue !== null
-        ? Math.round(atRisk.length * averageCustomerValue * CHURN_RETENTION_SUCCESS_RATE * 100) / 100
+        ? Math.round(atRisk.length * averageCustomerValue * CHURN_RETENTION_SUCCESS_RATE * 100) /
+          100
         : null;
 
     return [

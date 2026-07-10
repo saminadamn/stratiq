@@ -88,7 +88,13 @@ export class GenerateReportUseCase {
           this.getCustomerSegments.execute(organizationId, datasetId),
           this.getProductRecommendations.execute(organizationId, datasetId),
         ]);
-        return this.reportBuilder.buildPredictionReport(generatedAt, churn, forecast, segments, recommendations);
+        return this.reportBuilder.buildPredictionReport(
+          generatedAt,
+          churn,
+          forecast,
+          segments,
+          recommendations,
+        );
       }
       case 'RECOMMENDATION': {
         const decisions = await this.getDecisionIntelligence.execute(organizationId, datasetId);

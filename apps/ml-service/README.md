@@ -25,8 +25,8 @@ pytest
 
 ## Environment variables
 
-| Variable                    | Default          | Purpose                                  |
-| ---------------------------- | ----------------- | ----------------------------------------- |
-| `ML_SERVICE_PORT`            | `8000`            | Port uvicorn binds to                     |
-| `ML_SERVICE_LOG_LEVEL`       | `INFO`            | Structured JSON log level                 |
-| `ML_SERVICE_MODEL_STORE_PATH`| `./model_store`   | Where versioned model artifacts are saved |
+| Variable                      | Default         | Purpose                                   |
+| ----------------------------- | --------------- | ----------------------------------------- |
+| `ML_SERVICE_PORT`             | `8000`          | Port uvicorn binds to                     |
+| `ML_SERVICE_LOG_LEVEL`        | `INFO`          | Structured JSON log level                 |
+| `ML_SERVICE_MODEL_STORE_PATH` | `./model_store` | Where versioned model artifacts are saved |

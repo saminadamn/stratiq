@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AnalyticsFiltersDto, BenchmarkResultDto, ExecutiveDashboardDto, TrendAnalysisDto } from '@stratiq/shared';
+import type {
+  AnalyticsFiltersDto,
+  BenchmarkResultDto,
+  ExecutiveDashboardDto,
+  TrendAnalysisDto,
+} from '@stratiq/shared';
 import { useAuth } from '../../auth/auth-context';
 import { ApiError } from '../../lib/api-client';
 import { getExecutiveDashboard } from '../../lib/analytics-api';
@@ -23,7 +28,11 @@ import { TrendIndicator } from '../../components/analytics/TrendIndicator';
 type ViewMode = 'EXECUTIVE' | 'MANAGER' | 'ANALYST';
 
 const VIEW_MODES: Array<{ mode: ViewMode; label: string; description: string }> = [
-  { mode: 'EXECUTIVE', label: 'Executive', description: 'Headline KPIs and strategic recommendations only' },
+  {
+    mode: 'EXECUTIVE',
+    label: 'Executive',
+    description: 'Headline KPIs and strategic recommendations only',
+  },
   { mode: 'MANAGER', label: 'Manager', description: 'Operational detail — orders, stock, alerts' },
   { mode: 'ANALYST', label: 'Analyst', description: 'Everything, full detail' },
 ];
@@ -38,7 +47,9 @@ export function ExecutiveDashboardPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [revenueTrend, setRevenueTrend] = useState<TrendAnalysisDto | null>(null);
   const [revenueBenchmark, setRevenueBenchmark] = useState<BenchmarkResultDto | null>(null);
-  const [profitMarginBenchmark, setProfitMarginBenchmark] = useState<BenchmarkResultDto | null>(null);
+  const [profitMarginBenchmark, setProfitMarginBenchmark] = useState<BenchmarkResultDto | null>(
+    null,
+  );
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,7 +71,9 @@ export function ExecutiveDashboardPage(): JSX.Element {
     if (!organizationId) {
       return;
     }
-    getTrend(organizationId, 'revenue').then(setRevenueTrend).catch(() => setRevenueTrend(null));
+    getTrend(organizationId, 'revenue')
+      .then(setRevenueTrend)
+      .catch(() => setRevenueTrend(null));
     getBenchmark(organizationId, 'revenue', 'MONTH')
       .then(setRevenueBenchmark)
       .catch(() => setRevenueBenchmark(null));
@@ -90,7 +103,9 @@ export function ExecutiveDashboardPage(): JSX.Element {
     <div>
       <div className="mb-4 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Executive Overview</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+            Executive Overview
+          </h1>
           <p className="text-sm text-slate-500">
             {VIEW_MODES.find((v) => v.mode === viewMode)?.description}
           </p>

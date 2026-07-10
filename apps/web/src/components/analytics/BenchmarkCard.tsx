@@ -17,7 +17,12 @@ function formatByUnit(value: number | null, unit: MetricUnit): string {
 // One metric's current-vs-previous-period comparison (see benchmark-engine.
 // service.ts) — "current" is the latest period actually present in the
 // dataset, not necessarily this calendar month.
-export function BenchmarkCard({ label, unit, benchmark, isLoading }: BenchmarkCardProps): JSX.Element {
+export function BenchmarkCard({
+  label,
+  unit,
+  benchmark,
+  isLoading,
+}: BenchmarkCardProps): JSX.Element {
   const changeColor =
     benchmark?.changePercent === null || benchmark?.changePercent === undefined
       ? 'text-slate-500'

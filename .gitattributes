@@ -1,0 +1,6 @@
+# Normalize all text files to LF in the repository regardless of the
+# committing machine's git config — without this, a Windows checkout with
+# core.autocrlf=true writes CRLF to the working directory, and those CRLF
+# line endings can end up committed, which then fails `prettier --check`
+# (Prettier defaults to LF) even though the code itself never changed.
+* text=auto eol=lf

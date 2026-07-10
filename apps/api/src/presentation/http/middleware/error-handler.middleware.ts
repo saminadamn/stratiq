@@ -37,7 +37,10 @@ export function createErrorHandlerMiddleware(logger: Logger) {
     // here instead (Sprint 2: dataset uploads).
     if (err instanceof MulterError && err.code === 'LIMIT_FILE_SIZE') {
       res.status(413).json({
-        error: { code: 'FILE_TOO_LARGE', message: 'Uploaded file exceeds the maximum allowed size.' },
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: 'Uploaded file exceeds the maximum allowed size.',
+        },
       });
       return;
     }
@@ -45,7 +48,8 @@ export function createErrorHandlerMiddleware(logger: Logger) {
     logger.error('Unhandled request error', {
       method: req.method,
       path: req.path,
-      error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
+      error:
+        err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
     });
     res.status(500).json({
       error: { code: 'INTERNAL_SERVER_ERROR', message: 'Something went wrong.' },

@@ -41,20 +41,39 @@ function computeColumnWidths(
   return rawWidths.map((w) => (w / sum) * totalWidth);
 }
 
-function rowHeight(doc: PDFDocument, headers: string[], row: Record<string, string | number>, widths: number[]): number {
+function rowHeight(
+  doc: PDFDocument,
+  headers: string[],
+  row: Record<string, string | number>,
+  widths: number[],
+): number {
   let max = FONT_SIZE + CELL_PADDING * 2;
   headers.forEach((header, i) => {
     const text = String(row[header] ?? '');
     const columnWidth = widths[i] ?? MIN_COLUMN_WIDTH;
-    const height = doc.heightOfString(text, { width: columnWidth - CELL_PADDING * 2 }) + CELL_PADDING * 2;
+    const height =
+      doc.heightOfString(text, { width: columnWidth - CELL_PADDING * 2 }) + CELL_PADDING * 2;
     max = Math.max(max, height);
   });
   return max;
 }
 
-function drawHeaderRow(doc: PDFDocument, headers: string[], widths: number[], x: number, y: number): number {
+function drawHeaderRow(
+  doc: PDFDocument,
+  headers: string[],
+  widths: number[],
+  x: number,
+  y: number,
+): number {
   const height = FONT_SIZE + CELL_PADDING * 2;
-  doc.rect(x, y, widths.reduce((a, b) => a + b, 0), height).fill(HEADER_BG);
+  doc
+    .rect(
+      x,
+      y,
+      widths.reduce((a, b) => a + b, 0),
+      height,
+    )
+    .fill(HEADER_BG);
   let cellX = x;
   doc.font('Helvetica-Bold').fontSize(FONT_SIZE).fillColor(HEADER_TEXT);
   headers.forEach((header, i) => {
@@ -120,7 +139,12 @@ export function drawTable(
       });
       // Vertical column separators, drawn after the text so they sit on top.
       if (i > 0) {
-        doc.strokeColor(BORDER_COLOR).lineWidth(0.5).moveTo(cellX, cursorY).lineTo(cellX, cursorY + height).stroke();
+        doc
+          .strokeColor(BORDER_COLOR)
+          .lineWidth(0.5)
+          .moveTo(cellX, cursorY)
+          .lineTo(cellX, cursorY + height)
+          .stroke();
       }
       cellX += columnWidth;
     });

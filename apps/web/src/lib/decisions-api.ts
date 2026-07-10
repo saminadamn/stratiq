@@ -6,7 +6,9 @@ export interface DecisionIntelligenceResult {
   recommendations: DecisionRecommendationDto[];
 }
 
-export function getDecisionIntelligence(organizationId: string): Promise<DecisionIntelligenceResult> {
+export function getDecisionIntelligence(
+  organizationId: string,
+): Promise<DecisionIntelligenceResult> {
   return apiClient.get<DecisionIntelligenceResult>(
     `/api/v1/organizations/${organizationId}/analytics/decisions`,
   );

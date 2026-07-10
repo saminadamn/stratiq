@@ -16,7 +16,13 @@ describe('drawChart', () => {
     const doc = newDoc();
     const nextY = drawChart(
       doc,
-      { type: 'bar', data: [{ label: 'A', value: 10 }, { label: 'B', value: 20 }] },
+      {
+        type: 'bar',
+        data: [
+          { label: 'A', value: 10 },
+          { label: 'B', value: 20 },
+        ],
+      },
       50,
       100,
       400,
@@ -29,7 +35,13 @@ describe('drawChart', () => {
     const doc = newDoc();
     const nextY = drawChart(
       doc,
-      { type: 'line', data: [{ label: '2024-01', value: 100 }, { label: '2024-02', value: 150 }] },
+      {
+        type: 'line',
+        data: [
+          { label: '2024-01', value: 100 },
+          { label: '2024-02', value: 150 },
+        ],
+      },
       50,
       100,
       400,

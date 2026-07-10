@@ -5,7 +5,10 @@ import { toBusinessRuleDto } from '../mappers.js';
 export class CreateBusinessRuleUseCase {
   constructor(private readonly businessRules: BusinessRuleRepository) {}
 
-  async execute(organizationId: string, input: CreateBusinessRuleRequestDto): Promise<BusinessRuleDto> {
+  async execute(
+    organizationId: string,
+    input: CreateBusinessRuleRequestDto,
+  ): Promise<BusinessRuleDto> {
     const rule = await this.businessRules.create({
       organizationId,
       metricKey: input.metricKey,

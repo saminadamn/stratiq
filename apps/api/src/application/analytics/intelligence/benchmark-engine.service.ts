@@ -69,10 +69,14 @@ export class BenchmarkEngineService {
     const plan = this.planPeriods(latestDate, period);
 
     const currentRows = dated
-      .filter((entry) => entry.date >= plan.currentRange.start && entry.date <= plan.currentRange.end)
+      .filter(
+        (entry) => entry.date >= plan.currentRange.start && entry.date <= plan.currentRange.end,
+      )
       .map((entry) => entry.row);
     const previousRows = dated
-      .filter((entry) => entry.date >= plan.previousRange.start && entry.date <= plan.previousRange.end)
+      .filter(
+        (entry) => entry.date >= plan.previousRange.start && entry.date <= plan.previousRange.end,
+      )
       .map((entry) => entry.row);
 
     const currentValue = currentRows.length > 0 ? calculator(currentRows, columns) : null;
@@ -104,7 +108,10 @@ export class BenchmarkEngineService {
         currentLabel: monthLabel(latestDate),
         previousLabel: monthLabel(previousAnchor),
         currentRange: { start: startOfMonthUTC(latestDate), end: endOfMonthUTC(latestDate) },
-        previousRange: { start: startOfMonthUTC(previousAnchor), end: endOfMonthUTC(previousAnchor) },
+        previousRange: {
+          start: startOfMonthUTC(previousAnchor),
+          end: endOfMonthUTC(previousAnchor),
+        },
       };
     }
 
@@ -114,7 +121,10 @@ export class BenchmarkEngineService {
         currentLabel: quarterLabel(latestDate),
         previousLabel: quarterLabel(previousAnchor),
         currentRange: { start: startOfQuarterUTC(latestDate), end: endOfQuarterUTC(latestDate) },
-        previousRange: { start: startOfQuarterUTC(previousAnchor), end: endOfQuarterUTC(previousAnchor) },
+        previousRange: {
+          start: startOfQuarterUTC(previousAnchor),
+          end: endOfQuarterUTC(previousAnchor),
+        },
       };
     }
 

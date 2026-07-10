@@ -15,11 +15,19 @@ const LABEL_FONT_SIZE = 7;
 // to capture a chart image is a heavy dependency for what these reports
 // need: a handful of bars or a trend line over already-aggregated data (see
 // docs/ARCHITECTURE.md's Module 3 decision).
-export function drawChart(doc: PDFDocument, chart: PdfChartSpec, x: number, y: number, width: number): number {
+export function drawChart(
+  doc: PDFDocument,
+  chart: PdfChartSpec,
+  x: number,
+  y: number,
+  width: number,
+): number {
   if (chart.data.length === 0) {
     return y;
   }
-  return chart.type === 'bar' ? drawBarChart(doc, chart.data, x, y, width) : drawLineChart(doc, chart.data, x, y, width);
+  return chart.type === 'bar'
+    ? drawBarChart(doc, chart.data, x, y, width)
+    : drawLineChart(doc, chart.data, x, y, width);
 }
 
 function drawBarChart(
@@ -34,7 +42,12 @@ function drawBarChart(
   const barWidth = Math.max(4, (width - barGap * (data.length - 1)) / data.length);
   const chartBottom = y + CHART_HEIGHT;
 
-  doc.strokeColor(AXIS_COLOR).lineWidth(1).moveTo(x, chartBottom).lineTo(x + width, chartBottom).stroke();
+  doc
+    .strokeColor(AXIS_COLOR)
+    .lineWidth(1)
+    .moveTo(x, chartBottom)
+    .lineTo(x + width, chartBottom)
+    .stroke();
 
   data.forEach((point, index) => {
     const barHeight = (point.value / maxValue) * (CHART_HEIGHT - 20);
@@ -44,7 +57,10 @@ function drawBarChart(
     doc
       .fillColor('#000000')
       .fontSize(LABEL_FONT_SIZE)
-      .text(truncateLabel(point.label), barX, chartBottom + 2, { width: barWidth + barGap, align: 'center' });
+      .text(truncateLabel(point.label), barX, chartBottom + 2, {
+        width: barWidth + barGap,
+        align: 'center',
+      });
   });
 
   doc.fillColor('#000000');
@@ -64,7 +80,12 @@ function drawLineChart(
   const chartBottom = y + CHART_HEIGHT;
   const stepX = data.length > 1 ? width / (data.length - 1) : 0;
 
-  doc.strokeColor(AXIS_COLOR).lineWidth(1).moveTo(x, chartBottom).lineTo(x + width, chartBottom).stroke();
+  doc
+    .strokeColor(AXIS_COLOR)
+    .lineWidth(1)
+    .moveTo(x, chartBottom)
+    .lineTo(x + width, chartBottom)
+    .stroke();
 
   doc.strokeColor(LINE_COLOR).lineWidth(1.5);
   data.forEach((point, index) => {
@@ -83,7 +104,10 @@ function drawLineChart(
     doc
       .fillColor('#000000')
       .fontSize(LABEL_FONT_SIZE)
-      .text(truncateLabel(point.label), pointX - 15, chartBottom + 2, { width: 30, align: 'center' });
+      .text(truncateLabel(point.label), pointX - 15, chartBottom + 2, {
+        width: 30,
+        align: 'center',
+      });
   });
 
   doc.fillColor('#000000');

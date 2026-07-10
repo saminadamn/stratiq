@@ -1,7 +1,10 @@
 import type { Prisma, PrismaClient, ReportType as PrismaReportType } from '@prisma/client';
 import type { ReportType } from '@stratiq/shared';
 import type { Report } from '../../domain/entities/report.entity.js';
-import type { CreateReportInput, ReportRepository } from '../../domain/repositories/report.repository.js';
+import type {
+  CreateReportInput,
+  ReportRepository,
+} from '../../domain/repositories/report.repository.js';
 
 const REPORT_INCLUDE = {
   generatedBy: { select: { id: true, name: true } },

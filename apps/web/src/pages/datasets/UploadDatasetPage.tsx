@@ -69,7 +69,9 @@ export function UploadDatasetPage(): JSX.Element {
       <div className="mx-auto max-w-2xl">
         <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold tracking-tight text-slate-900">{result.dataset.name}</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+              {result.dataset.name}
+            </h2>
             <QualityScoreBadge score={result.validationReport.qualityScore} />
           </div>
           <p className="mb-4 text-sm text-slate-500">

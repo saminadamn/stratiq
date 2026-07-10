@@ -1,6 +1,9 @@
 import type { AlertStatus, Prisma, PrismaClient } from '@prisma/client';
 import type { Alert } from '../../domain/entities/alert.entity.js';
-import type { AlertRepository, CreateAlertInput } from '../../domain/repositories/alert.repository.js';
+import type {
+  AlertRepository,
+  CreateAlertInput,
+} from '../../domain/repositories/alert.repository.js';
 
 type AlertRow = Prisma.AlertGetPayload<Record<string, never>>;
 

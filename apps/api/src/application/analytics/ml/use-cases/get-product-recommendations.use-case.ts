@@ -24,12 +24,16 @@ export class GetProductRecommendationsUseCase {
     const context = await this.resolveDataset.resolve(organizationId, datasetId);
 
     if (!forceRefresh) {
-      const existing = await this.predictions.findByDatasetVersion(context.datasetVersionId, 'RECOMMENDATION');
+      const existing = await this.predictions.findByDatasetVersion(
+        context.datasetVersionId,
+        'RECOMMENDATION',
+      );
       if (existing.length > 0) {
         return existing.map((prediction) => ({
           customerId: prediction.targetId as string,
           recommendedProductId: prediction.valueJson['recommendedProductId'] as string,
-          recommendedProductName: (prediction.valueJson['recommendedProductName'] as string | null) ?? null,
+          recommendedProductName:
+            (prediction.valueJson['recommendedProductName'] as string | null) ?? null,
           score: prediction.valueJson['score'] as number,
           reason: prediction.valueJson['reason'] as string,
         }));
@@ -37,7 +41,10 @@ export class GetProductRecommendationsUseCase {
     }
 
     const productCatalog = this.featureStore.buildProductCatalog(context.rows, context.columns);
-    const customerPurchases = this.featureStore.buildCustomerPurchases(context.rows, context.columns);
+    const customerPurchases = this.featureStore.buildCustomerPurchases(
+      context.rows,
+      context.columns,
+    );
     if (productCatalog.length === 0 || customerPurchases.length === 0) {
       return [];
     }

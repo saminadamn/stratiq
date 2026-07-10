@@ -1,4 +1,9 @@
-import type { InsightSeverity, MetricUnit, TimeSeriesPointDto, TrendDirection } from '@stratiq/shared';
+import type {
+  InsightSeverity,
+  MetricUnit,
+  TimeSeriesPointDto,
+  TrendDirection,
+} from '@stratiq/shared';
 import type { BusinessRule } from '../../../domain/entities/business-rule.entity.js';
 import type { MetricDefinition } from '../../../domain/entities/metric-definition.entity.js';
 import type { AnalyticsColumns } from '../column-detection.js';
@@ -51,7 +56,13 @@ export class InsightEngineService {
 
       const series = monthlySeriesByMetric[metric.key] ?? [];
       const trendResult = this.trendDetection.analyze(series);
-      const benchmark = this.benchmarkEngine.compare(rows, columns, metric.key, calculator, 'MONTH');
+      const benchmark = this.benchmarkEngine.compare(
+        rows,
+        columns,
+        metric.key,
+        calculator,
+        'MONTH',
+      );
       // Nothing to report if the metric has no computable value this period
       // (e.g. no date column, or the current month has zero matching rows).
       if (!benchmark || benchmark.currentValue === null) {
@@ -132,7 +143,9 @@ export class InsightEngineService {
     }
 
     if (trendResult.outliers.length > 0) {
-      parts.push(`Unusual activity was detected in ${trendResult.outliers.map((o) => o.period).join(', ')}.`);
+      parts.push(
+        `Unusual activity was detected in ${trendResult.outliers.map((o) => o.period).join(', ')}.`,
+      );
     }
 
     for (const rule of triggeredRules) {
@@ -142,7 +155,10 @@ export class InsightEngineService {
     return parts.join(' ');
   }
 
-  private deriveSeverity(triggeredRules: TriggeredRule[], direction: TrendDirection): InsightSeverity {
+  private deriveSeverity(
+    triggeredRules: TriggeredRule[],
+    direction: TrendDirection,
+  ): InsightSeverity {
     if (triggeredRules.some((rule) => rule.severity === 'CRITICAL')) {
       return 'CRITICAL';
     }

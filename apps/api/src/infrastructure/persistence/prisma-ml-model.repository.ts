@@ -1,7 +1,10 @@
 import type { Prisma, MlModelKey as PrismaMlModelKey, PrismaClient } from '@prisma/client';
 import type { MlModelKey } from '@stratiq/shared';
 import type { MlModel } from '../../domain/entities/ml-model.entity.js';
-import type { CreateMlModelInput, MlModelRepository } from '../../domain/repositories/ml-model.repository.js';
+import type {
+  CreateMlModelInput,
+  MlModelRepository,
+} from '../../domain/repositories/ml-model.repository.js';
 
 type MlModelRow = Prisma.MlModelGetPayload<Record<string, never>>;
 
@@ -58,7 +61,10 @@ export class PrismaMlModelRepository implements MlModelRepository {
     return toDomain(row);
   }
 
-  async findByDatasetVersion(datasetVersionId: string, modelKey: MlModelKey): Promise<MlModel | null> {
+  async findByDatasetVersion(
+    datasetVersionId: string,
+    modelKey: MlModelKey,
+  ): Promise<MlModel | null> {
     // datasetVersionId is already unique per dataset (and a dataset belongs
     // to exactly one organization), so this is unambiguous without also
     // filtering by organizationId.

@@ -114,7 +114,9 @@ describe('Intelligence API (integration)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    const revenueInsight = first.body.insights.find((i: { metricKey: string }) => i.metricKey === 'revenue');
+    const revenueInsight = first.body.insights.find(
+      (i: { metricKey: string }) => i.metricKey === 'revenue',
+    );
     expect(revenueInsight).toBeDefined();
     expect(revenueInsight.severity).toBe('CRITICAL');
     expect(revenueInsight.trend).toBe('DECLINING');
@@ -134,7 +136,9 @@ describe('Intelligence API (integration)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    const revenueAlerts = list.body.alerts.filter((a: { metricKey: string }) => a.metricKey === 'revenue');
+    const revenueAlerts = list.body.alerts.filter(
+      (a: { metricKey: string }) => a.metricKey === 'revenue',
+    );
     const severities = revenueAlerts.map((a: { severity: string }) => a.severity).sort();
     expect(severities).toEqual(['CRITICAL', 'WARNING']);
     expect(revenueAlerts.every((a: { status: string }) => a.status === 'OPEN')).toBe(true);

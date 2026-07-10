@@ -1,4 +1,9 @@
-import { Prisma, type PrismaClient, type DecisionCategory as PrismaDecisionCategory, type RecommendationPriority as PrismaPriority } from '@prisma/client';
+import {
+  Prisma,
+  type PrismaClient,
+  type DecisionCategory as PrismaDecisionCategory,
+  type RecommendationPriority as PrismaPriority,
+} from '@prisma/client';
 import type { DecisionCategory, RecommendationPriority } from '@stratiq/shared';
 import type { DecisionRecommendation } from '../../domain/entities/decision-recommendation.entity.js';
 import type {

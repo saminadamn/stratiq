@@ -36,7 +36,9 @@ export function LoginPage(): JSX.Element {
         </div>
 
         <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
-        <p className="mb-6 text-sm text-slate-500">Sign in to your decision intelligence workspace.</p>
+        <p className="mb-6 text-sm text-slate-500">
+          Sign in to your decision intelligence workspace.
+        </p>
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
           <div>
@@ -66,9 +68,7 @@ export function LoginPage(): JSX.Element {
             />
           </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-          )}
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <button
             type="submit"

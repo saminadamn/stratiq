@@ -70,7 +70,12 @@ describe('RootCauseAnalysisService', () => {
 
   it('does not attribute a driver for a metric with no known drivers', () => {
     const [cause] = service.analyze(
-      [insight({ metricKey: 'repeatPurchaseRate', title: 'Repeat Purchase Rate is trending down' })],
+      [
+        insight({
+          metricKey: 'repeatPurchaseRate',
+          title: 'Repeat Purchase Rate is trending down',
+        }),
+      ],
       {},
     );
     expect(cause?.driverMetricKey).toBeNull();

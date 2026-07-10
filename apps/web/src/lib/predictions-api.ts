@@ -11,7 +11,9 @@ function base(organizationId: string): string {
 }
 
 export async function getChurnPredictions(organizationId: string): Promise<ChurnPredictionDto[]> {
-  const result = await apiClient.get<{ predictions: ChurnPredictionDto[] }>(`${base(organizationId)}/churn`);
+  const result = await apiClient.get<{ predictions: ChurnPredictionDto[] }>(
+    `${base(organizationId)}/churn`,
+  );
   return result.predictions;
 }
 
@@ -19,7 +21,9 @@ export function getSalesForecast(organizationId: string): Promise<SalesForecastD
   return apiClient.get<SalesForecastDto | null>(`${base(organizationId)}/forecast`);
 }
 
-export function getCustomerSegments(organizationId: string): Promise<CustomerSegmentationDto | null> {
+export function getCustomerSegments(
+  organizationId: string,
+): Promise<CustomerSegmentationDto | null> {
   return apiClient.get<CustomerSegmentationDto | null>(`${base(organizationId)}/segments`);
 }
 

@@ -27,7 +27,10 @@ export class GetCustomerSegmentsUseCase {
     const context = await this.resolveDataset.resolve(organizationId, datasetId);
 
     if (!forceRefresh) {
-      const existing = await this.predictions.findByDatasetVersion(context.datasetVersionId, 'SEGMENTATION');
+      const existing = await this.predictions.findByDatasetVersion(
+        context.datasetVersionId,
+        'SEGMENTATION',
+      );
       const summaryRow = existing.find((row) => row.targetType === SUMMARY_TARGET_TYPE);
       if (summaryRow) {
         const assignments = existing

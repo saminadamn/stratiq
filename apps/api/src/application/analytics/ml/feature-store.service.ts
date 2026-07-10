@@ -55,9 +55,15 @@ export class FeatureStoreService {
 
     return aggregates.map((customer) => {
       const frequency = customer.orderKeys.size;
-      const recencyDays = latestOrderDate && customer.lastOrderDate
-        ? Math.max(0, Math.round((latestOrderDate.getTime() - customer.lastOrderDate.getTime()) / MS_PER_DAY))
-        : 0;
+      const recencyDays =
+        latestOrderDate && customer.lastOrderDate
+          ? Math.max(
+              0,
+              Math.round(
+                (latestOrderDate.getTime() - customer.lastOrderDate.getTime()) / MS_PER_DAY,
+              ),
+            )
+          : 0;
       return {
         customerId: customer.customerId,
         customerName: customer.customerName,
@@ -80,7 +86,7 @@ export class FeatureStoreService {
   }
 
   buildCustomerPurchases(rows: Row[], columns: AnalyticsColumns): CustomerPurchaseRecord[] {
-    if (!columns.customerId || !columns.productId && !columns.productName) {
+    if (!columns.customerId || (!columns.productId && !columns.productName)) {
       return [];
     }
     const purchases = new Map<string, Set<string>>();

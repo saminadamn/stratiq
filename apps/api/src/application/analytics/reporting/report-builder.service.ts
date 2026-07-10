@@ -39,12 +39,18 @@ export class ReportBuilderService {
           })),
           chart: {
             type: 'line',
-            data: dashboard.monthlyRevenueTrend.map((point) => ({ label: point.period, value: point.value })),
+            data: dashboard.monthlyRevenueTrend.map((point) => ({
+              label: point.period,
+              value: point.value,
+            })),
           },
         },
         {
           heading: 'Revenue by Category',
-          rows: dashboard.revenueByCategory.map((entry) => ({ category: entry.label, revenue: entry.value })),
+          rows: dashboard.revenueByCategory.map((entry) => ({
+            category: entry.label,
+            revenue: entry.value,
+          })),
           chart: {
             type: 'bar',
             data: dashboard.revenueByCategory
@@ -91,7 +97,10 @@ export class ReportBuilderService {
           })),
           chart: {
             type: 'bar',
-            data: kpis.topProducts.map((product) => ({ label: product.productName, value: product.revenue })),
+            data: kpis.topProducts.map((product) => ({
+              label: product.productName,
+              value: product.revenue,
+            })),
           },
         },
       ],
@@ -164,7 +173,10 @@ export class ReportBuilderService {
     };
   }
 
-  buildRecommendationReport(generatedAt: string, decisions: DecisionRecommendationDto[]): PdfReportRequest {
+  buildRecommendationReport(
+    generatedAt: string,
+    decisions: DecisionRecommendationDto[],
+  ): PdfReportRequest {
     const rootCauses = decisions.filter((item) => item.category === 'ROOT_CAUSE');
     const recommendations = decisions.filter((item) => item.category === 'RECOMMENDATION');
 
@@ -174,7 +186,10 @@ export class ReportBuilderService {
       sections: [
         {
           heading: 'Root Causes',
-          rows: rootCauses.map((item) => ({ title: item.title, explanation: item.rootCause ?? '' })),
+          rows: rootCauses.map((item) => ({
+            title: item.title,
+            explanation: item.rootCause ?? '',
+          })),
         },
         {
           heading: 'Recommendations',
@@ -188,7 +203,10 @@ export class ReportBuilderService {
             recommendations.length > 0
               ? {
                   type: 'bar',
-                  data: recommendations.map((item) => ({ label: item.title, value: item.impactScore })),
+                  data: recommendations.map((item) => ({
+                    label: item.title,
+                    value: item.impactScore,
+                  })),
                 }
               : undefined,
         },

@@ -40,8 +40,12 @@ export function SignupPage(): JSX.Element {
           <span className="text-base font-semibold tracking-tight text-slate-900">StratIQ</span>
         </div>
 
-        <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">Create your workspace</h1>
-        <p className="mb-6 text-sm text-slate-500">You&apos;ll be the owner of a new organization.</p>
+        <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">
+          Create your workspace
+        </h1>
+        <p className="mb-6 text-sm text-slate-500">
+          You&apos;ll be the owner of a new organization.
+        </p>
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
           <div>
@@ -98,9 +102,7 @@ export function SignupPage(): JSX.Element {
             />
           </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-          )}
+          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
           <button
             type="submit"

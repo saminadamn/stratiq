@@ -5,7 +5,10 @@ import { TrendDetectionService } from './trend-detection.service.js';
 const service = new TrendDetectionService();
 
 function series(values: number[]): TimeSeriesPointDto[] {
-  return values.map((value, index) => ({ period: `2026-${String(index + 1).padStart(2, '0')}`, value }));
+  return values.map((value, index) => ({
+    period: `2026-${String(index + 1).padStart(2, '0')}`,
+    value,
+  }));
 }
 
 describe('TrendDetectionService', () => {

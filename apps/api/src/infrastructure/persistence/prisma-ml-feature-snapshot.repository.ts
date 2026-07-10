@@ -38,7 +38,10 @@ export class PrismaMlFeatureSnapshotRepository implements MlFeatureSnapshotRepos
     });
   }
 
-  async findByDatasetVersion(datasetVersionId: string, entityType: string): Promise<MlFeatureSnapshot[]> {
+  async findByDatasetVersion(
+    datasetVersionId: string,
+    entityType: string,
+  ): Promise<MlFeatureSnapshot[]> {
     const rows = await this.prisma.mlFeatureSnapshot.findMany({
       where: { datasetVersionId, entityType },
     });

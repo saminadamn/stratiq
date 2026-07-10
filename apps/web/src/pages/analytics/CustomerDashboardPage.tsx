@@ -53,7 +53,9 @@ export function CustomerDashboardPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Customer Analytics</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+            Customer Analytics
+          </h1>
           <p className="text-sm text-slate-500">Understand customer behavior and loyalty.</p>
         </div>
         <div className="flex items-center gap-3">

@@ -48,7 +48,8 @@ export function PredictionsPanel({ organizationId }: PredictionsPanelProps): JSX
         setRecommendations(recommendationsResult);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Unable to load predictions.');
+        if (!cancelled)
+          setError(err instanceof ApiError ? err.message : 'Unable to load predictions.');
       });
     return () => {
       cancelled = true;
@@ -86,7 +87,9 @@ export function PredictionsPanel({ organizationId }: PredictionsPanelProps): JSX
           </div>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Sales Forecast</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Sales Forecast
+            </p>
             {!forecast || forecast.forecast.length === 0 ? (
               <p className="mt-1 text-sm text-slate-400">Not enough history to forecast.</p>
             ) : (
@@ -100,7 +103,9 @@ export function PredictionsPanel({ organizationId }: PredictionsPanelProps): JSX
           </div>
 
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Customer Segments</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Customer Segments
+            </p>
             {!segments || segments.segments.length === 0 ? (
               <p className="mt-1 text-sm text-slate-400">Not enough customers to segment.</p>
             ) : (
@@ -126,8 +131,11 @@ export function PredictionsPanel({ organizationId }: PredictionsPanelProps): JSX
             ) : (
               <ul className="mt-1 space-y-1 text-sm text-slate-700">
                 {recommendations.slice(0, 5).map((recommendation, index) => (
-                  <li key={`${recommendation.customerId}-${recommendation.recommendedProductId}-${index}`}>
-                    {recommendation.customerId} → {recommendation.recommendedProductName ?? recommendation.recommendedProductId}
+                  <li
+                    key={`${recommendation.customerId}-${recommendation.recommendedProductId}-${index}`}
+                  >
+                    {recommendation.customerId} →{' '}
+                    {recommendation.recommendedProductName ?? recommendation.recommendedProductId}
                   </li>
                 ))}
               </ul>

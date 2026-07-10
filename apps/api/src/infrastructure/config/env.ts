@@ -39,7 +39,11 @@ const envSchema = z
 
     // v1.0 (Production Readiness).
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    RATE_LIMIT_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(15 * 60 * 1000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   })
   .superRefine((env, ctx) => {

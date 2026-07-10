@@ -23,11 +23,7 @@ const PERCENT_CHANGE_COMPARATORS = new Set(['PERCENT_CHANGE_ABOVE', 'PERCENT_CHA
 // fired, so "how bad is this" is always a configuration decision, not an
 // inferred one.
 export class BusinessRulesEngineService {
-  evaluate(
-    rules: BusinessRule[],
-    metricKey: string,
-    input: RuleEvaluationInput,
-  ): TriggeredRule[] {
+  evaluate(rules: BusinessRule[], metricKey: string, input: RuleEvaluationInput): TriggeredRule[] {
     return rules
       .filter((rule) => rule.metricKey === metricKey && rule.isActive)
       .filter((rule) => this.checkCondition(rule, input))
@@ -56,7 +52,9 @@ export class BusinessRulesEngineService {
   }
 
   private actualValueFor(rule: BusinessRule, input: RuleEvaluationInput): number {
-    return PERCENT_CHANGE_COMPARATORS.has(rule.comparator) ? (input.changePercent ?? 0) : input.currentValue;
+    return PERCENT_CHANGE_COMPARATORS.has(rule.comparator)
+      ? (input.changePercent ?? 0)
+      : input.currentValue;
   }
 
   private buildMessage(rule: BusinessRule, input: RuleEvaluationInput): string {

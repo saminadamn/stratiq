@@ -46,7 +46,10 @@ function IconBox(props: SVGProps<SVGSVGElement>) {
 function IconDocument(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} {...props}>
-      <path d="M6 2.5h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z" strokeLinejoin="round" />
+      <path
+        d="M6 2.5h6l3 3v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
+        strokeLinejoin="round"
+      />
       <path d="M12 2.5v3h3" strokeLinejoin="round" />
       <path d="M7 11h6M7 14h6" strokeLinecap="round" />
     </svg>
@@ -143,7 +146,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps): JSX.Elem
                 {primaryOrganization.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-700">{primaryOrganization.name}</p>
+                <p className="truncate text-sm font-medium text-slate-700">
+                  {primaryOrganization.name}
+                </p>
                 <p className="text-xs text-slate-400">{primaryOrganization.role}</p>
               </div>
             </div>

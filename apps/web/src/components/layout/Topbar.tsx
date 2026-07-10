@@ -25,7 +25,13 @@ export function Topbar({ onMenuClick }: TopbarProps): JSX.Element {
         aria-label="Open navigation menu"
         className="-ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
       >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-5 w-5">
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          className="h-5 w-5"
+        >
           <path d="M3 5h14M3 10h14M3 15h14" strokeLinecap="round" />
         </svg>
       </button>

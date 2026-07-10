@@ -78,16 +78,32 @@ describe('ReportBuilderService', () => {
 
   it('builds a prediction report that handles a null forecast gracefully', () => {
     const churn: ChurnPredictionDto[] = [
-      { customerId: 'C1', customerName: 'Alice', churnProbability: 0.9, confidence: 0.8, explanation: { method: 'x', topFeatures: [] } },
+      {
+        customerId: 'C1',
+        customerName: 'Alice',
+        churnProbability: 0.9,
+        confidence: 0.8,
+        explanation: { method: 'x', topFeatures: [] },
+      },
     ];
-    const request = builder.buildPredictionReport('2024-02-01T00:00:00.000Z', churn, null, null, []);
+    const request = builder.buildPredictionReport(
+      '2024-02-01T00:00:00.000Z',
+      churn,
+      null,
+      null,
+      [],
+    );
 
     const forecastSection = request.sections.find((s) => s.heading === 'Sales Forecast');
     expect(forecastSection?.rows).toEqual([]);
     expect(forecastSection?.chart).toBeUndefined();
 
     const churnSection = request.sections.find((s) => s.heading === 'Customer Churn Risk');
-    expect(churnSection?.rows[0]).toEqual({ customer: 'Alice', churnProbability: '90%', confidence: '80%' });
+    expect(churnSection?.rows[0]).toEqual({
+      customer: 'Alice',
+      churnProbability: '90%',
+      confidence: '80%',
+    });
   });
 
   it('builds a recommendation report splitting root causes from recommendations and flattening action plans', () => {
@@ -121,13 +137,19 @@ describe('ReportBuilderService', () => {
     const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', decisions);
 
     const rootCauseSection = request.sections.find((s) => s.heading === 'Root Causes');
-    expect(rootCauseSection?.rows).toEqual([{ title: 'Why Revenue declined', explanation: 'Orders dropped.' }]);
+    expect(rootCauseSection?.rows).toEqual([
+      { title: 'Why Revenue declined', explanation: 'Orders dropped.' },
+    ]);
 
     const recommendationSection = request.sections.find((s) => s.heading === 'Recommendations');
     expect(recommendationSection?.rows).toHaveLength(1);
-    expect(recommendationSection?.chart?.data).toEqual([{ label: 'Retain at-risk customers', value: 70 }]);
+    expect(recommendationSection?.chart?.data).toEqual([
+      { label: 'Retain at-risk customers', value: 70 },
+    ]);
 
-    const actionPlanSection = request.sections.find((s) => s.heading === '30/60/90-Day Action Plan');
+    const actionPlanSection = request.sections.find(
+      (s) => s.heading === '30/60/90-Day Action Plan',
+    );
     expect(actionPlanSection?.rows).toEqual([
       { recommendation: 'Retain at-risk customers', day: 30, action: 'Reach out directly.' },
     ]);

@@ -24,7 +24,10 @@ export class GetSalesForecastUseCase {
     const context = await this.resolveDataset.resolve(organizationId, datasetId);
 
     if (!forceRefresh) {
-      const existing = await this.predictions.findByDatasetVersion(context.datasetVersionId, 'FORECAST');
+      const existing = await this.predictions.findByDatasetVersion(
+        context.datasetVersionId,
+        'FORECAST',
+      );
       const row = existing[0];
       if (row) {
         return {

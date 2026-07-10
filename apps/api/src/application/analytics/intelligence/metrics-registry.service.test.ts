@@ -3,7 +3,9 @@ import { MetricNotFoundError } from '../../../domain/errors/intelligence-error.j
 import type { MetricDefinitionRepository } from '../../../domain/repositories/metric-definition.repository.js';
 import { MetricsRegistryService } from './metrics-registry.service.js';
 
-function buildRepository(overrides: Partial<MetricDefinitionRepository> = {}): MetricDefinitionRepository {
+function buildRepository(
+  overrides: Partial<MetricDefinitionRepository> = {},
+): MetricDefinitionRepository {
   return {
     upsertMany: vi.fn(),
     listAll: vi.fn().mockResolvedValue([]),

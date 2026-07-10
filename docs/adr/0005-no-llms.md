@@ -24,7 +24,7 @@ produce the exact same recommendation text, ROI estimate, and action plan.
 - Fully unit-testable with plain fixed-input/fixed-output assertions — no
   mocking an LLM API, no flakiness from non-deterministic generation.
 - No LLM API cost, latency, or availability dependency on the request path.
-- The tradeoff: recommendation *wording* is limited to what's been
+- The tradeoff: recommendation _wording_ is limited to what's been
   explicitly templated (see `recommendation-engine.service.ts`) rather than
   free-form prose — adding a new recommendation category means writing a
   new template, not just better prompting.

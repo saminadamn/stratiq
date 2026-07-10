@@ -50,12 +50,11 @@ export async function getInsights(organizationId: string, limit = 20): Promise<I
   return result.insights;
 }
 
-export async function getAlerts(
-  organizationId: string,
-  status?: AlertStatus,
-): Promise<AlertDto[]> {
+export async function getAlerts(organizationId: string, status?: AlertStatus): Promise<AlertDto[]> {
   const query = status ? `?status=${status}` : '';
-  const result = await apiClient.get<{ alerts: AlertDto[] }>(`${base(organizationId)}/alerts${query}`);
+  const result = await apiClient.get<{ alerts: AlertDto[] }>(
+    `${base(organizationId)}/alerts${query}`,
+  );
   return result.alerts;
 }
 

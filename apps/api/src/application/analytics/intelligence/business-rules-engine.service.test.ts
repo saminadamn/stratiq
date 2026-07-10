@@ -23,13 +23,19 @@ function rule(overrides: Partial<BusinessRule> = {}): BusinessRule {
 
 describe('BusinessRulesEngineService', () => {
   it('triggers a PERCENT_CHANGE_BELOW rule when the drop exceeds the threshold', () => {
-    const triggered = service.evaluate([rule()], 'revenue', { currentValue: 1000, changePercent: -25 });
+    const triggered = service.evaluate([rule()], 'revenue', {
+      currentValue: 1000,
+      changePercent: -25,
+    });
     expect(triggered).toHaveLength(1);
     expect(triggered[0]?.severity).toBe('WARNING');
   });
 
   it('does not trigger when the change is within the threshold', () => {
-    const triggered = service.evaluate([rule()], 'revenue', { currentValue: 1000, changePercent: -5 });
+    const triggered = service.evaluate([rule()], 'revenue', {
+      currentValue: 1000,
+      changePercent: -5,
+    });
     expect(triggered).toHaveLength(0);
   });
 
@@ -65,7 +71,10 @@ describe('BusinessRulesEngineService', () => {
   });
 
   it('does not trigger a percent-change rule when changePercent is null', () => {
-    const triggered = service.evaluate([rule()], 'revenue', { currentValue: 1000, changePercent: null });
+    const triggered = service.evaluate([rule()], 'revenue', {
+      currentValue: 1000,
+      changePercent: null,
+    });
     expect(triggered).toHaveLength(0);
   });
 });

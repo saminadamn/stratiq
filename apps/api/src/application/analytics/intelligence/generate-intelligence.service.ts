@@ -71,7 +71,11 @@ export class GenerateIntelligenceService {
       if (!calculator) {
         continue;
       }
-      monthlySeriesByMetric[metric.key] = computeMetricMonthlySeries(context.rows, context.columns, calculator);
+      monthlySeriesByMetric[metric.key] = computeMetricMonthlySeries(
+        context.rows,
+        context.columns,
+        calculator,
+      );
     }
 
     const generatedInsights = this.insightEngine.generate(
@@ -99,7 +103,8 @@ export class GenerateIntelligenceService {
         currentValue: generated.currentValue,
         previousValue: generated.previousValue,
         changePercent: generated.changePercent,
-        metadata: generated.outlierPeriods.length > 0 ? { outlierPeriods: generated.outlierPeriods } : null,
+        metadata:
+          generated.outlierPeriods.length > 0 ? { outlierPeriods: generated.outlierPeriods } : null,
       });
 
       for (const ruleId of generated.triggeredRuleIds) {

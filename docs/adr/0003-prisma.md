@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The repository-pattern domain layer (ADR 0001) needs *some* concrete
+The repository-pattern domain layer (ADR 0001) needs _some_ concrete
 implementation behind its interfaces, and the team wanted compile-time
 safety on queries rather than hand-written SQL strings scattered through
 `infrastructure/persistence/*.repository.ts`.
@@ -27,5 +27,5 @@ time, and swapping ORMs later only touches that one directory.
   cleanly (partial unique indexes — see the `business_rules` migration and
   its schema comment) — the ORM isn't treated as sacred where it gets in the way.
 - Cost: Prisma's client generation step is a real build dependency (`prisma
-  generate` must run before `tsc`), which is exactly what broke the first
+generate` must run before `tsc`), which is exactly what broke the first
   cloud deploy attempt until it was added to the build command explicitly.

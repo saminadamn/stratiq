@@ -18,18 +18,18 @@ Enterprise Business Intelligence & Decision Intelligence Platform. See
 
 ## Stack
 
-| Layer          | Choice                                                        |
-| -------------- | --------------------------------------------------------------- |
-| Frontend       | React + TypeScript + Tailwind CSS (Vite)                       |
-| Backend        | Express + TypeScript (Clean Architecture)                      |
-| ML service     | Python + FastAPI + scikit-learn (internal-only, called by the API) |
-| Database       | PostgreSQL + Prisma ORM                                        |
-| Auth           | JWT (access + refresh) with role-based access control          |
-| Logging        | pino (structured JSON)                                         |
-| Rate limiting  | express-rate-limit (global + stricter on login/signup)         |
-| Dev env        | Docker Compose                                                 |
-| Production     | Multi-stage Docker builds + nginx reverse proxy                |
-| CI             | GitHub Actions (lint, typecheck, test, build)                  |
+| Layer         | Choice                                                             |
+| ------------- | ------------------------------------------------------------------ |
+| Frontend      | React + TypeScript + Tailwind CSS (Vite)                           |
+| Backend       | Express + TypeScript (Clean Architecture)                          |
+| ML service    | Python + FastAPI + scikit-learn (internal-only, called by the API) |
+| Database      | PostgreSQL + Prisma ORM                                            |
+| Auth          | JWT (access + refresh) with role-based access control              |
+| Logging       | pino (structured JSON)                                             |
+| Rate limiting | express-rate-limit (global + stricter on login/signup)             |
+| Dev env       | Docker Compose                                                     |
+| Production    | Multi-stage Docker builds + nginx reverse proxy                    |
+| CI            | GitHub Actions (lint, typecheck, test, build)                      |
 
 ## Monorepo layout
 
@@ -47,9 +47,11 @@ StratIQ/
 ```
 
 ## System Design
+
 <img width="3734" height="4939" alt="Client-Driven API Graph-2026-07-10-104902" src="https://github.com/user-attachments/assets/e23b0cff-d82d-4718-ba1d-c28886964569" />
 
 ## API Internals
+
 <img width="3000" height="3348" alt="Client-Driven API Graph-2026-07-10-105154" src="https://github.com/user-attachments/assets/12f392b0-c448-4f4e-b6df-6fd928775770" />
 
 ## Database Schema
@@ -150,13 +152,13 @@ takes an `organizationId`) rather than relying on row-level security alone.
 Full reasoning lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the
 biggest single-topic decisions have their own ADRs:
 
-| Decision | Why |
-| --- | --- |
-| [Clean Architecture layering](docs/adr/0001-clean-architecture.md) | Business logic testable without a database; ORM/framework swappable without touching use cases |
+| Decision                                                                 | Why                                                                                                                  |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [Clean Architecture layering](docs/adr/0001-clean-architecture.md)       | Business logic testable without a database; ORM/framework swappable without touching use cases                       |
 | [PostgreSQL, not a separate document store](docs/adr/0002-postgresql.md) | One database for both strictly-relational (auth/RBAC) and semi-structured (dataset rows, ML features) data via JSONB |
-| [Prisma as the ORM](docs/adr/0003-prisma.md) | Compile-time-safe queries, generated migrations, isolated entirely inside `infrastructure/persistence/` |
-| [FastAPI for the ML service](docs/adr/0004-fastapi-ml-service.md) | Pydantic validation + free OpenAPI docs; kept as its own internal-only process, not embedded in the Node API |
-| [No LLMs in Decision Intelligence](docs/adr/0005-no-llms.md) | Fixed-template recommendations are reproducible and unit-testable — same inputs always produce the same output |
+| [Prisma as the ORM](docs/adr/0003-prisma.md)                             | Compile-time-safe queries, generated migrations, isolated entirely inside `infrastructure/persistence/`              |
+| [FastAPI for the ML service](docs/adr/0004-fastapi-ml-service.md)        | Pydantic validation + free OpenAPI docs; kept as its own internal-only process, not embedded in the Node API         |
+| [No LLMs in Decision Intelligence](docs/adr/0005-no-llms.md)             | Fixed-template recommendations are reproducible and unit-testable — same inputs always produce the same output       |
 
 ## Prerequisites
 
@@ -235,13 +237,13 @@ root, e.g. `curl http://localhost/health/ready`.
 See [.env.example](.env.example) for the full list with explanations. The
 ones most likely to need changing per environment:
 
-| Variable                | Default                       | Purpose                                                        |
-| ------------------------ | ------------------------------- | ------------------------------------------------------------- |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets |
-| `ML_SERVICE_URL`         | `http://localhost:8000`        | Where the API reaches the ML service (`http://ml-service:8000` in prod compose) |
-| `LOG_LEVEL`              | `info`                         | pino log level                                                 |
-| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | `900000` / `300`  | Global API rate limit (login/signup have their own fixed, stricter limit) |
-| `HTTP_PORT`              | `80`                            | Host port nginx publishes (prod compose only)                  |
+| Variable                                   | Default                                         | Purpose                                                                         |
+| ------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets                                        |
+| `ML_SERVICE_URL`                           | `http://localhost:8000`                         | Where the API reaches the ML service (`http://ml-service:8000` in prod compose) |
+| `LOG_LEVEL`                                | `info`                                          | pino log level                                                                  |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`  | `900000` / `300`                                | Global API rate limit (login/signup have their own fixed, stricter limit)       |
+| `HTTP_PORT`                                | `80`                                            | Host port nginx publishes (prod compose only)                                   |
 
 ## Security
 
@@ -254,7 +256,7 @@ What's actually implemented, not a wishlist:
   rotating refresh tokens with two distinct signing secrets (a leaked
   access-token key can't forge a refresh token, or vice versa)
 - **RBAC** — every authorization check resolves `(userId, organizationId)
-  → role` from `Membership`, never a global user role (see ADR 0001)
+→ role` from `Membership`, never a global user role (see ADR 0001)
 - **Rate limiting** — global limit on `/api/v1/*`, plus a separate, fixed,
   stricter limit on `/auth/login` and `/auth/signup` specifically (brute
   force / credential-stuffing targets)

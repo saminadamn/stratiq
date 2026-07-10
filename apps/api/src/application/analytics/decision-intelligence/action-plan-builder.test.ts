@@ -14,6 +14,8 @@ describe('ActionPlanBuilder', () => {
   });
 
   it('returns a different plan for a different category', () => {
-    expect(builder.build('REVENUE_DECLINE_ORDERS')).not.toEqual(builder.build('REVENUE_DECLINE_AOV'));
+    expect(builder.build('REVENUE_DECLINE_ORDERS')).not.toEqual(
+      builder.build('REVENUE_DECLINE_AOV'),
+    );
   });
 });

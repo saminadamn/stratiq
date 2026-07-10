@@ -1,6 +1,11 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { ALERT_STATUSES, BENCHMARK_PERIODS, RULE_COMPARATORS, ALERT_SEVERITIES } from '@stratiq/shared';
+import {
+  ALERT_STATUSES,
+  BENCHMARK_PERIODS,
+  RULE_COMPARATORS,
+  ALERT_SEVERITIES,
+} from '@stratiq/shared';
 import type { GetMetricsRegistryUseCase } from '../../../application/analytics/intelligence/use-cases/get-metrics-registry.use-case.js';
 import type { GetMetricDefinitionUseCase } from '../../../application/analytics/intelligence/use-cases/get-metric-definition.use-case.js';
 import type { GetTrendUseCase } from '../../../application/analytics/intelligence/use-cases/get-trend.use-case.js';
@@ -151,7 +156,10 @@ export function createIntelligenceController(deps: IntelligenceControllerDeps) {
 
     createBusinessRule: asyncHandler(async (req: Request, res: Response) => {
       const body = createRuleBodySchema.parse(req.body);
-      const result = await deps.createBusinessRule.execute(req.params['organizationId'] as string, body);
+      const result = await deps.createBusinessRule.execute(
+        req.params['organizationId'] as string,
+        body,
+      );
       res.status(201).json(result);
     }),
 

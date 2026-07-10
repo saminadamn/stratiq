@@ -1,7 +1,10 @@
 import type { Prisma, MlModelKey as PrismaMlModelKey, PrismaClient } from '@prisma/client';
 import type { MlModelKey } from '@stratiq/shared';
 import type { Prediction } from '../../domain/entities/prediction.entity.js';
-import type { CreatePredictionInput, PredictionRepository } from '../../domain/repositories/prediction.repository.js';
+import type {
+  CreatePredictionInput,
+  PredictionRepository,
+} from '../../domain/repositories/prediction.repository.js';
 
 type PredictionRow = Prisma.PredictionGetPayload<Record<string, never>>;
 
@@ -43,7 +46,10 @@ export class PrismaPredictionRepository implements PredictionRepository {
     });
   }
 
-  async findByDatasetVersion(datasetVersionId: string, modelKey: MlModelKey): Promise<Prediction[]> {
+  async findByDatasetVersion(
+    datasetVersionId: string,
+    modelKey: MlModelKey,
+  ): Promise<Prediction[]> {
     const rows = await this.prisma.prediction.findMany({
       where: { datasetVersionId, modelKey: modelKey as PrismaMlModelKey },
       orderBy: { createdAt: 'asc' },

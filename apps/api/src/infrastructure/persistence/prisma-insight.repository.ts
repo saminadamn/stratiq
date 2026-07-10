@@ -1,6 +1,9 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { Insight } from '../../domain/entities/insight.entity.js';
-import type { CreateInsightInput, InsightRepository } from '../../domain/repositories/insight.repository.js';
+import type {
+  CreateInsightInput,
+  InsightRepository,
+} from '../../domain/repositories/insight.repository.js';
 
 type InsightRow = Prisma.InsightGetPayload<Record<string, never>>;
 
@@ -38,7 +41,8 @@ export class PrismaInsightRepository implements InsightRepository {
         currentValue: input.currentValue,
         previousValue: input.previousValue,
         changePercent: input.changePercent,
-        metadata: input.metadata === null ? Prisma.JsonNull : (input.metadata as Prisma.InputJsonValue),
+        metadata:
+          input.metadata === null ? Prisma.JsonNull : (input.metadata as Prisma.InputJsonValue),
       },
     });
     return toDomain(row);

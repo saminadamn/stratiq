@@ -22,7 +22,7 @@ presentation/      Express routes, controllers, middleware.
 ```
 
 `presentation → application → domain`, and `infrastructure` only ever
-*implements* domain repository interfaces — it's never imported by
+_implements_ domain repository interfaces — it's never imported by
 `application` directly. Wiring happens once, in `composition-root.ts`.
 
 ## Consequences

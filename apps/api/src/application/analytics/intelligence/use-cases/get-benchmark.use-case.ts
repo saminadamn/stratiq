@@ -27,7 +27,13 @@ export class GetBenchmarkUseCase {
       throw new MetricNotComputableError();
     }
 
-    const result = this.benchmarkEngine.compare(context.rows, context.columns, metricKey, calculator, period);
+    const result = this.benchmarkEngine.compare(
+      context.rows,
+      context.columns,
+      metricKey,
+      calculator,
+      period,
+    );
     if (!result) {
       throw new MetricNotComputableError();
     }

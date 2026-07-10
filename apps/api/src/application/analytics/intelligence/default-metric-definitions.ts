@@ -88,7 +88,8 @@ export const DEFAULT_METRIC_DEFINITIONS: UpsertMetricDefinitionInput[] = [
   {
     key: 'monthlyGrowthRate',
     name: 'Monthly Growth Rate',
-    description: 'Percentage change in revenue between the two most recent months present in the data.',
+    description:
+      'Percentage change in revenue between the two most recent months present in the data.',
     category: 'GROWTH',
     formula: '((This Month Revenue − Last Month Revenue) / Last Month Revenue) × 100',
     unit: 'PERCENTAGE',

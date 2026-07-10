@@ -93,15 +93,33 @@ describe('RecommendationEngineService', () => {
 
   it('produces no churn recommendation when nobody is above the risk threshold', () => {
     const predictions: ChurnPredictionDto[] = [
-      { customerId: 'C1', customerName: null, churnProbability: 0.2, confidence: 0.8, explanation: { method: 'x', topFeatures: [] } },
+      {
+        customerId: 'C1',
+        customerName: null,
+        churnProbability: 0.2,
+        confidence: 0.8,
+        explanation: { method: 'x', topFeatures: [] },
+      },
     ];
     expect(engine.fromChurnPredictions(predictions, 100)).toEqual([]);
   });
 
   it('estimates churn ROI from average customer value and the retention success rate', () => {
     const predictions: ChurnPredictionDto[] = [
-      { customerId: 'C1', customerName: null, churnProbability: 0.9, confidence: 0.8, explanation: { method: 'x', topFeatures: [] } },
-      { customerId: 'C2', customerName: null, churnProbability: 0.7, confidence: 0.8, explanation: { method: 'x', topFeatures: [] } },
+      {
+        customerId: 'C1',
+        customerName: null,
+        churnProbability: 0.9,
+        confidence: 0.8,
+        explanation: { method: 'x', topFeatures: [] },
+      },
+      {
+        customerId: 'C2',
+        customerName: null,
+        churnProbability: 0.7,
+        confidence: 0.8,
+        explanation: { method: 'x', topFeatures: [] },
+      },
     ];
     const [recommendation] = engine.fromChurnPredictions(predictions, 100);
     expect(recommendation?.roiEstimate).toBe(60); // 2 customers * 100 * 0.3

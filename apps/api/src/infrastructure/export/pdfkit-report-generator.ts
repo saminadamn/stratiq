@@ -55,7 +55,11 @@ export class PdfKitReportGenerator implements ReportGenerator {
         }
 
         if (section.rows.length === 0) {
-          doc.fontSize(10).fillColor(MUTED_COLOR).font('Helvetica-Oblique').text('No data available.');
+          doc
+            .fontSize(10)
+            .fillColor(MUTED_COLOR)
+            .font('Helvetica-Oblique')
+            .text('No data available.');
           doc.fillColor(BODY_COLOR).font('Helvetica');
         } else {
           const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -78,13 +82,21 @@ function drawCoverPage(doc: PDFDocument, request: PdfReportRequest): void {
   // login page — one consistent brand mark across the product, not a
   // separate logo invented just for PDFs.
   doc.roundedRect(50, 50, 32, 32, 6).fill('#ffffff');
-  doc.fillColor(BRAND_COLOR).font('Helvetica-Bold').fontSize(16).text('S', 50, 60, { width: 32, align: 'center' });
+  doc
+    .fillColor(BRAND_COLOR)
+    .font('Helvetica-Bold')
+    .fontSize(16)
+    .text('S', 50, 60, { width: 32, align: 'center' });
   doc
     .fillColor('#ffffff')
     .font('Helvetica-Bold')
     .fontSize(14)
     .text('STRATIQ', 92, 60, { characterSpacing: 1.5 });
-  doc.font('Helvetica').fontSize(9).fillColor('#ccfbf1').text('Enterprise Business Intelligence & Decision Intelligence', 92, 78);
+  doc
+    .font('Helvetica')
+    .fontSize(9)
+    .fillColor('#ccfbf1')
+    .text('Enterprise Business Intelligence & Decision Intelligence', 92, 78);
 
   doc
     .fillColor('#ffffff')
@@ -97,7 +109,11 @@ function drawCoverPage(doc: PDFDocument, request: PdfReportRequest): void {
     month: 'long',
     day: 'numeric',
   });
-  doc.fillColor(HEADING_COLOR).font('Helvetica').fontSize(11).text(`Prepared ${generatedDate}`, 50, bandHeight + 30);
+  doc
+    .fillColor(HEADING_COLOR)
+    .font('Helvetica')
+    .fontSize(11)
+    .text(`Prepared ${generatedDate}`, 50, bandHeight + 30);
   doc
     .fillColor(MUTED_COLOR)
     .fontSize(9)

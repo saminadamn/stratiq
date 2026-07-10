@@ -47,7 +47,9 @@ export class GenerateDecisionIntelligenceService {
     forceRefresh: boolean,
   ): Promise<void> {
     if (!forceRefresh) {
-      const existing = await this.decisionRecommendations.findByDatasetVersion(context.datasetVersionId);
+      const existing = await this.decisionRecommendations.findByDatasetVersion(
+        context.datasetVersionId,
+      );
       if (existing.length > 0) {
         return;
       }
@@ -69,7 +71,8 @@ export class GenerateDecisionIntelligenceService {
       confidence: prediction.confidence,
       explanation: prediction.explanationJson as unknown as ChurnPredictionDto['explanation'],
     }));
-    const averageCustomerValue = this.calculators['customerLifetimeValue']?.(context.rows, context.columns) ?? null;
+    const averageCustomerValue =
+      this.calculators['customerLifetimeValue']?.(context.rows, context.columns) ?? null;
 
     const recommendations: GeneratedRecommendation[] = [
       ...this.recommendationEngine.fromRootCauses(rootCauses, benchmarks),
@@ -115,7 +118,13 @@ export class GenerateDecisionIntelligenceService {
       if (!calculator) {
         continue;
       }
-      const result = this.benchmarkEngine.compare(context.rows, context.columns, key, calculator, 'MONTH');
+      const result = this.benchmarkEngine.compare(
+        context.rows,
+        context.columns,
+        key,
+        calculator,
+        'MONTH',
+      );
       if (result) {
         benchmarks[key] = result;
       }

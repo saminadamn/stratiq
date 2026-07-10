@@ -15,7 +15,11 @@ export class GetTrendUseCase {
     private readonly trendDetection: TrendDetectionService,
   ) {}
 
-  async execute(organizationId: string, metricKey: string, datasetId?: string): Promise<TrendAnalysisDto> {
+  async execute(
+    organizationId: string,
+    metricKey: string,
+    datasetId?: string,
+  ): Promise<TrendAnalysisDto> {
     await this.metricsRegistry.getByKey(metricKey);
     const context = await this.resolveDataset.resolve(organizationId, datasetId);
     const calculator = buildMetricCalculators(this.inventoryAnalytics)[metricKey];
