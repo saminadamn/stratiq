@@ -67,9 +67,9 @@ export function UploadDatasetPage(): JSX.Element {
   if (result) {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">{result.dataset.name}</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">{result.dataset.name}</h2>
             <QualityScoreBadge score={result.validationReport.qualityScore} />
           </div>
           <p className="mb-4 text-sm text-slate-500">
@@ -104,7 +104,7 @@ export function UploadDatasetPage(): JSX.Element {
           <div className="mt-6 flex gap-3">
             <Link
               to={`/datasets/${result.dataset.id}`}
-              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500"
             >
               View dataset
             </Link>
@@ -122,11 +122,11 @@ export function UploadDatasetPage(): JSX.Element {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Upload dataset</h1>
+      <h1 className="mb-6 text-xl font-semibold tracking-tight text-slate-900">Upload dataset</h1>
 
       <form
         onSubmit={(event) => void handleSubmit(event)}
-        className="space-y-5 rounded-lg border border-slate-200 bg-white p-6"
+        className="space-y-5 rounded-xl border border-slate-200/70 bg-white shadow-card p-6"
       >
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-slate-700">
@@ -201,7 +201,7 @@ export function UploadDatasetPage(): JSX.Element {
         <button
           type="submit"
           disabled={isSubmitting || !organizationId}
-          className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
           {isSubmitting ? 'Uploading…' : 'Upload'}
         </button>

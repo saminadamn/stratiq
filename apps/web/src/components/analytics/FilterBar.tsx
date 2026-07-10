@@ -24,7 +24,7 @@ export function FilterBar({
   }
 
   return (
-    <div className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+    <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
       <div>
         <label className="block text-xs font-medium text-slate-500">From</label>
         <input

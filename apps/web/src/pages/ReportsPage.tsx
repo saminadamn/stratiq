@@ -77,13 +77,13 @@ export function ReportsPage(): JSX.Element {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-slate-900">Reports</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Reports</h1>
         <p className="text-sm text-slate-500">Generate executive reports and download past ones.</p>
       </div>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mb-6 rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Generate a report</h2>
         <div className="flex flex-wrap gap-2">
           {REPORT_TYPES.map((type) => (
@@ -100,7 +100,7 @@ export function ReportsPage(): JSX.Element {
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Report History</h2>
         {!reports ? (
           <p className="text-sm text-slate-400">Loading…</p>

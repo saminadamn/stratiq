@@ -53,7 +53,7 @@ export function CustomerDashboardPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Customer Analytics</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Customer Analytics</h1>
           <p className="text-sm text-slate-500">Understand customer behavior and loyalty.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -146,7 +146,7 @@ export function CustomerDashboardPage(): JSX.Element {
           </ChartCard>
         </div>
 
-        <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="mt-6 rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-900">Cohort Analysis</h3>
           {dashboard && dashboard.cohortAnalysis.length > 0 ? (
             <CohortTable rows={dashboard.cohortAnalysis} />

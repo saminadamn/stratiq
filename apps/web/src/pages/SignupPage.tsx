@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { ApiError } from '../lib/api-client';
 
+const inputClassName =
+  'mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+
 export function SignupPage(): JSX.Element {
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -28,10 +31,17 @@ export function SignupPage(): JSX.Element {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-slate-900">Create your StratIQ workspace</h1>
-        <p className="mb-6 text-sm text-slate-500">You'll be the owner of a new organization.</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#F8F9FB] bg-[radial-gradient(circle_at_top,theme(colors.teal.50),transparent_55%)] px-4 py-10">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200/70 bg-white p-8 shadow-card">
+        <div className="mb-6 flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+            S
+          </div>
+          <span className="text-base font-semibold tracking-tight text-slate-900">StratIQ</span>
+        </div>
+
+        <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">Create your workspace</h1>
+        <p className="mb-6 text-sm text-slate-500">You&apos;ll be the owner of a new organization.</p>
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
           <div>
@@ -44,7 +54,7 @@ export function SignupPage(): JSX.Element {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={inputClassName}
             />
           </div>
           <div>
@@ -57,7 +67,7 @@ export function SignupPage(): JSX.Element {
               required
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={inputClassName}
             />
           </div>
           <div>
@@ -70,7 +80,7 @@ export function SignupPage(): JSX.Element {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={inputClassName}
             />
           </div>
           <div>
@@ -84,16 +94,18 @@ export function SignupPage(): JSX.Element {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className={inputClassName}
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="w-full rounded-lg bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </button>

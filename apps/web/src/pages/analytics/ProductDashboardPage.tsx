@@ -80,7 +80,7 @@ export function ProductDashboardPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Product Analytics</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Product Analytics</h1>
           <p className="text-sm text-slate-500">Which products drive the business?</p>
         </div>
         <div className="flex items-center gap-3">

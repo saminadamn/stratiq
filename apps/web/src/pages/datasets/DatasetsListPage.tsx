@@ -42,12 +42,12 @@ export function DatasetsListPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Datasets</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Datasets</h1>
           <p className="text-sm text-slate-500">Upload, validate, and clean business datasets.</p>
         </div>
         <Link
           to="/datasets/upload"
-          className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500"
         >
           Upload dataset
         </Link>
@@ -62,7 +62,7 @@ export function DatasetsListPage(): JSX.Element {
           No datasets yet. Upload your first CSV or Excel file to get started.
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200/70 bg-white shadow-card">
           {datasets.map((dataset) => (
             <li key={dataset.id} className="flex items-center justify-between gap-4 px-4 py-4">
               <div>

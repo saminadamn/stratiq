@@ -48,7 +48,7 @@ export function DecisionIntelligencePanel({ organizationId }: DecisionIntelligen
     .sort((a, b) => b.impactScore - a.impactScore);
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">Decision Intelligence</h3>
       {error ? (
         <p className="text-sm text-red-600">{error}</p>

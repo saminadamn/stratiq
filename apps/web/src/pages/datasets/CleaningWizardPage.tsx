@@ -66,9 +66,9 @@ export function CleaningWizardPage(): JSX.Element {
   if (result) {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
               {result.dataset.name} — version {result.version.versionNumber}
             </h2>
             <QualityScoreBadge score={result.validationReport.qualityScore} />
@@ -82,7 +82,7 @@ export function CleaningWizardPage(): JSX.Element {
 
           <Link
             to={`/datasets/${result.dataset.id}`}
-            className="mt-6 inline-block rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="mt-6 inline-block rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500"
           >
             View dataset
           </Link>
@@ -93,9 +93,9 @@ export function CleaningWizardPage(): JSX.Element {
 
   return (
     <div className="mx-auto max-w-xl">
-      <h1 className="mb-6 text-lg font-semibold text-slate-900">Clean dataset</h1>
+      <h1 className="mb-6 text-xl font-semibold tracking-tight text-slate-900">Clean dataset</h1>
 
-      <div className="space-y-5 rounded-lg border border-slate-200 bg-white p-6">
+      <div className="space-y-5 rounded-xl border border-slate-200/70 bg-white shadow-card p-6">
         <fieldset>
           <legend className="text-sm font-medium text-slate-700">Cleaning mode</legend>
           <div className="mt-2 space-y-2">
@@ -144,7 +144,7 @@ export function CleaningWizardPage(): JSX.Element {
           type="button"
           disabled={isSubmitting}
           onClick={() => void handleSubmit()}
-          className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:opacity-50"
         >
           {isSubmitting ? 'Cleaning…' : 'Run cleaning'}
         </button>

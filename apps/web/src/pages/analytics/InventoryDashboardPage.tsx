@@ -61,7 +61,7 @@ export function InventoryDashboardPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Inventory</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Inventory</h1>
           <p className="text-sm text-slate-500">Operational efficiency at a glance.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -122,7 +122,7 @@ export function InventoryDashboardPage(): JSX.Element {
           </ChartCard>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-900">Stock Levels</h3>
           {pageRows.length === 0 ? (
             <p className="text-sm text-slate-400">No inventory data available.</p>

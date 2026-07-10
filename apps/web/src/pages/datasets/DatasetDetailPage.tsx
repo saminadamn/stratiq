@@ -77,7 +77,7 @@ export function DatasetDetailPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">{dataset.name}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">{dataset.name}</h1>
           <p className="text-sm text-slate-500">
             {(dataset.latestVersion?.rowCount ?? 0).toLocaleString()} rows ·{' '}
             {dataset.latestVersion?.columnCount ?? 0} columns · v
@@ -88,7 +88,7 @@ export function DatasetDetailPage(): JSX.Element {
           <QualityScoreBadge score={dataset.latestVersion?.qualityScore ?? null} />
           <Link
             to={`/datasets/${dataset.id}/clean`}
-            className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500"
           >
             Clean dataset
           </Link>
@@ -119,7 +119,7 @@ export function DatasetDetailPage(): JSX.Element {
           <p className="text-sm text-slate-500">No rows to display.</p>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <div className="overflow-x-auto rounded-xl border border-slate-200/70 bg-white shadow-card">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50">
                   <tr>
@@ -186,7 +186,7 @@ export function DatasetDetailPage(): JSX.Element {
         (!history ? (
           <p className="text-sm text-slate-500">Loading history…</p>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200/70 bg-white shadow-card">
             {history.versions.map((version) => (
               <li
                 key={version.versionNumber}

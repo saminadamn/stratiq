@@ -74,7 +74,7 @@ export function ExecutiveDashboardPage(): JSX.Element {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Executive Overview</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Executive Overview</h1>
           <p className="text-sm text-slate-500">How is the business performing today?</p>
         </div>
         <div className="flex items-center gap-3">

@@ -26,7 +26,7 @@ export function BenchmarkCard({ label, unit, benchmark, isLoading }: BenchmarkCa
         : 'text-red-700';
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       {isLoading || !benchmark ? (
         <p className="mt-2 text-sm text-slate-400">Loading…</p>
