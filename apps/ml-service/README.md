@@ -10,9 +10,12 @@ never called directly by the frontend — see `docs/ARCHITECTURE.md` for why.
 cd apps/ml-service
 python -m venv .venv
 .venv/Scripts/activate   # .venv/bin/activate on macOS/Linux
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + pytest/httpx
 uvicorn app.main:app --reload --port 8000
 ```
+
+`requirements.txt` alone is runtime-only (what the prod Docker image
+installs); `requirements-dev.txt` adds pytest/httpx for local testing.
 
 ## Test
 

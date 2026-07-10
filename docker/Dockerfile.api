@@ -1,23 +1,64 @@
-# Development image for @stratiq/api. Not intended for production use yet —
-# there is no multi-stage/production build here because this step's scope is
-# the local dev environment only.
-FROM node:22-alpine
+# Multi-stage build for @stratiq/api.
+#
+#   docker build -f docker/Dockerfile.api --target dev  .   # local dev (default)
+#   docker build -f docker/Dockerfile.api --target prod .   # production image
+#
+# `dev` is deliberately the last stage in this file: Docker uses the last
+# stage as the default build target when none is specified, and
+# docker/docker-compose.yml (the existing local dev stack) builds this file
+# without a `target:`, so it must keep resolving to `dev` unchanged.
 
+FROM node:22-alpine AS deps
 WORKDIR /app
-
-# Copy just the manifests first so `npm install` is cached across rebuilds
-# unless a package.json actually changed.
 COPY package.json package-lock.json* ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
-
 RUN npm install
 
+# Build stage: compile TypeScript and generate the Prisma client once, then
+# drop devDependencies so the prod stage only copies production-sized
+# node_modules (Prisma's generated client lives under node_modules/.prisma
+# and node_modules/@prisma/client, both of which `npm prune` leaves alone
+# since @prisma/client is a runtime dependency of @stratiq/api).
+FROM deps AS build
 COPY . .
-
 RUN npx prisma generate --schema apps/api/prisma/schema.prisma
+RUN npm run build -w @stratiq/shared
+RUN npm run build -w @stratiq/api
+RUN npm prune --omit=dev
 
+# Prod target: compiled output + pruned node_modules only — no TypeScript,
+# no dev tooling, no bind-mounted source.
+FROM node:22-alpine AS prod
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build /app/apps/api/openapi.yaml ./apps/api/openapi.yaml
+COPY --from=build /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=build /app/packages/shared/dist ./packages/shared/dist
+WORKDIR /app/apps/api
 EXPOSE 4000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
+  CMD wget -qO- http://localhost:4000/health || exit 1
+# Applies any pending migrations before the server starts — there is no
+# separate migration job/container (deliberately: "no unnecessary infra"),
+# so this container's boot is the only place `prisma migrate deploy` runs in
+# production. Safe to run on every restart: migrate deploy is a no-op when
+# there's nothing pending.
+# The prisma binary lives in /app/node_modules/.bin (npm workspaces hoist it
+# to the repo root, not into apps/api/node_modules), so it's addressed by
+# absolute path rather than relative to this stage's WORKDIR.
+CMD ["sh", "-c", "/app/node_modules/.bin/prisma migrate deploy --schema=./prisma/schema.prisma && node dist/main.js"]
 
+# Dev target: today's behavior, unchanged — docker-compose.yml bind-mounts
+# the source tree over this for hot reload.
+FROM deps AS dev
+COPY . .
+RUN npx prisma generate --schema apps/api/prisma/schema.prisma
+EXPOSE 4000
 CMD ["npm", "run", "dev:api"]

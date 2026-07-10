@@ -53,6 +53,10 @@ export class PrismaBusinessRuleRepository implements BusinessRuleRepository {
         severity: input.severity,
         isDefault: input.isDefault ?? false,
       })),
+      // Relies on the partial unique index on (organizationId, name) WHERE
+      // isDefault — see ensure-default-business-rules.ts for why this is the
+      // DB-level guard against concurrent default-seeding races.
+      skipDuplicates: true,
     });
   }
 

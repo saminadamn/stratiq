@@ -21,19 +21,10 @@ function rule(overrides: Partial<BusinessRule> = {}): BusinessRule {
 }
 
 describe('ensureDefaultBusinessRules', () => {
-  it('seeds defaults only once when called concurrently for the same organization', async () => {
-    // Simulates two requests (e.g. the Insights and Alerts panels mounting
-    // together) both reading the pre-seed count before either has inserted
-    // anything — the exact race that previously double-seeded defaults.
-    let seededCount = 0;
-    const createMany = vi.fn(async () => {
-      seededCount = 4;
-    });
-    const countByOrganization = vi.fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      return seededCount;
-    });
-    const listByOrganization = vi.fn(async () => (seededCount > 0 ? [rule(), rule(), rule(), rule()] : []));
+  it('seeds defaults when the organization has none yet', async () => {
+    const createMany = vi.fn(async () => {});
+    const countByOrganization = vi.fn(async () => 0);
+    const listByOrganization = vi.fn(async () => [rule(), rule(), rule(), rule()]);
 
     const repository: BusinessRuleRepository = {
       create: vi.fn(),
@@ -45,16 +36,42 @@ describe('ensureDefaultBusinessRules', () => {
       countByOrganization,
     };
 
-    const [first, second] = await Promise.all([
-      ensureDefaultBusinessRules(repository, 'org-1'),
-      ensureDefaultBusinessRules(repository, 'org-1'),
-    ]);
+    const rules = await ensureDefaultBusinessRules(repository, 'org-1');
 
     expect(createMany).toHaveBeenCalledTimes(1);
-    expect(first).toHaveLength(4);
-    expect(second).toHaveLength(4);
+    expect(rules).toHaveLength(4);
   });
 
+  it('skips seeding when the organization already has rules', async () => {
+    const createMany = vi.fn(async () => {});
+    const countByOrganization = vi.fn(async () => 4);
+    const listByOrganization = vi.fn(async () => [rule(), rule(), rule(), rule()]);
+
+    const repository: BusinessRuleRepository = {
+      create: vi.fn(),
+      createMany,
+      listByOrganization,
+      findByOrganizationAndId: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      countByOrganization,
+    };
+
+    await ensureDefaultBusinessRules(repository, 'org-1');
+
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
+  // Two concurrent requests for the same organization (e.g. the Insights and
+  // Alerts panels mounting together) can both pass this function's
+  // countByOrganization === 0 check before either has inserted anything, so
+  // both may call createMany. That's expected and safe: deduplication is no
+  // longer this function's job — it's a DB-level guard (a partial unique
+  // index on (organizationId, name) WHERE isDefault, migration
+  // 20260710150412, applied via createMany's skipDuplicates) that only a
+  // real database can enforce, so it isn't exercised by this mocked-repository
+  // unit test. See src/__tests__/integration/intelligence-flow.test.ts for
+  // coverage against real Postgres.
   it('does not serialize seeding across different organizations', async () => {
     const createMany = vi.fn(async () => {});
     const countByOrganization = vi.fn(async () => 0);

@@ -2,6 +2,8 @@ import type { PrismaClient } from '@prisma/client';
 import type { Express } from 'express';
 import path from 'node:path';
 import { loadEnv, type Env } from './infrastructure/config/env.js';
+import { PinoLogger } from './infrastructure/logging/pino-logger.js';
+import type { Logger } from './application/ports/logger.port.js';
 import { createPrismaClient } from './infrastructure/persistence/prisma-client.js';
 import { PrismaUserRepository } from './infrastructure/persistence/prisma-user.repository.js';
 import { PrismaOrganizationRepository } from './infrastructure/persistence/prisma-organization.repository.js';
@@ -117,6 +119,7 @@ export interface Server {
   app: Express;
   prisma: PrismaClient;
   env: Env;
+  logger: Logger;
 }
 
 // The composition root: the only place infrastructure implementations
@@ -128,6 +131,7 @@ export interface Server {
 export async function createServer(): Promise<Server> {
   const env = loadEnv();
   const prisma = createPrismaClient();
+  const logger = new PinoLogger(env.LOG_LEVEL);
 
   const userRepository = new PrismaUserRepository(prisma);
   const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -304,6 +308,15 @@ export async function createServer(): Promise<Server> {
 
   const app = createApp({
     corsOrigin: env.CORS_ORIGIN,
+    logger,
+    rateLimit: {
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+      max: env.RATE_LIMIT_MAX,
+    },
+    readiness: {
+      prisma,
+      mlServiceUrl: env.ML_SERVICE_URL,
+    },
     routesDeps: {
       auth: {
         signup: new SignupUseCase(
@@ -457,5 +470,5 @@ export async function createServer(): Promise<Server> {
     },
   });
 
-  return { app, prisma, env };
+  return { app, prisma, env, logger };
 }

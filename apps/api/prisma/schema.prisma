@@ -502,6 +502,13 @@ model BusinessRule {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   alerts       Alert[]
 
+  // There is also a partial unique index — CREATE UNIQUE INDEX ON
+  // business_rules (organizationId, name) WHERE isDefault — added by
+  // migration 20260710150412 to guard concurrent default-rule seeding.
+  // Prisma's schema DSL has no partial-index syntax, so it isn't declared
+  // here; `prisma migrate dev` will not see it as schema drift because no
+  // model change corresponds to it, but don't be surprised it doesn't show
+  // up if you inspect this file alone — see ensure-default-business-rules.ts.
   @@index([organizationId, metricKey])
   @@map("business_rules")
 }

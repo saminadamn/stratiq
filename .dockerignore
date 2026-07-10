@@ -1,0 +1,36 @@
+# Build context exclusions. Without this, every `docker build` sends the
+# entire monorepo — including all node_modules (with their npm-workspace
+# symlinks/junctions, which some Docker builds fail to checksum on Windows)
+# and the Python venv — as build context, which is both extremely slow and
+# fragile. Each Docker stage runs its own `npm install`/`pip install`, so
+# none of this needs to be sent at all.
+node_modules
+**/node_modules
+.git
+
+# Build/test output
+apps/api/dist
+apps/web/dist
+packages/shared/dist
+coverage
+.nyc_output
+
+# Runtime data that shouldn't be baked into an image
+apps/api/storage
+apps/ml-service/model_store
+!apps/ml-service/model_store/.gitkeep
+
+# Python
+apps/ml-service/.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.coverage
+
+# Local env/secrets and editor/OS cruft
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+.DS_Store

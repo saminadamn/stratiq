@@ -1,16 +1,32 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import type { PrismaClient } from '@prisma/client';
 import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { parse as parseYaml } from 'yaml';
 import { createApiRouter, type ApiRoutesDeps } from './routes/index.js';
-import { errorHandlerMiddleware } from './middleware/error-handler.middleware.js';
+import { createErrorHandlerMiddleware } from './middleware/error-handler.middleware.js';
+import { createGlobalRateLimiter } from './middleware/rate-limit.middleware.js';
+import { createReadinessHandler } from './readiness.js';
+import type { Logger } from '../../application/ports/logger.port.js';
 
 export interface CreateAppOptions {
   corsOrigin: string;
   routesDeps: ApiRoutesDeps;
+  logger: Logger;
+  rateLimit: {
+    windowMs: number;
+    max: number;
+  };
+  // Liveness (`/health`) only checks the process is up; readiness
+  // (`/health/ready`) checks these actual dependencies are reachable — an
+  // orchestrator uses the two differently (restart vs. hold out of rotation).
+  readiness: {
+    prisma: PrismaClient;
+    mlServiceUrl: string;
+  };
 }
 
 // openapi.yaml lives at the package root; process.cwd() is always apps/api
@@ -40,17 +56,22 @@ export function createApp(options: CreateAppOptions): Express {
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
+  app.get('/health/ready', createReadinessHandler(options.readiness));
 
   const openApiDocument = loadOpenApiDocument();
   if (openApiDocument) {
     app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
   }
 
-  app.use('/api/v1', createApiRouter(options.routesDeps));
+  app.use(
+    '/api/v1',
+    createGlobalRateLimiter(options.rateLimit.windowMs, options.rateLimit.max),
+    createApiRouter(options.routesDeps),
+  );
 
   // Must be registered last: Express identifies error-handling middleware by
   // its four-parameter signature and only invokes it after `next(err)`.
-  app.use(errorHandlerMiddleware);
+  app.use(createErrorHandlerMiddleware(options.logger));
 
   return app;
 }
