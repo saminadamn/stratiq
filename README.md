@@ -38,6 +38,11 @@ StratIQ/
 ├── docs/               # Architecture Decision Records
 └── .github/workflows   # CI
 ```
+## System Design
+<img width="3734" height="4939" alt="Client-Driven API Graph-2026-07-10-104902" src="https://github.com/user-attachments/assets/e23b0cff-d82d-4718-ba1d-c28886964569" />
+
+## API Internals
+<img width="3000" height="3348" alt="Client-Driven API Graph-2026-07-10-105154" src="https://github.com/user-attachments/assets/12f392b0-c448-4f4e-b6df-6fd928775770" />
 
 ## Prerequisites
 
