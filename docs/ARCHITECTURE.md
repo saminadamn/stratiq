@@ -152,3 +152,122 @@ user-supplied filename, which is what rules out path traversal. `LocalFileStorag
 the same `FileStorage` port an S3/GCS-backed implementation would, so moving to object storage
 in production is a new adapter class and a line in the composition root, not a rewrite of
 upload/delete logic.
+
+# Sprint 3 & 4: Analytics, Benchmarks, and the Intelligence Layer
+
+## Dashboard data is derived on read, cached per dataset version
+
+The four dashboards (Executive/Customer/Product/Inventory) never write their own tables —
+every KPI, trend, and chart is computed from `DatasetRow` on request and cached in-process
+keyed by `(organizationId, datasetVersionId, dashboardType)`. Because `DatasetVersion` rows
+are immutable (Sprint 2), a cache entry never goes stale: the same version always produces
+the same numbers, so there's no invalidation logic to get wrong, only a cache that's either
+present or gets recomputed once.
+
+## Insights/Alerts generate once per dataset version, not per request
+
+`GenerateIntelligenceService` checks whether any `Insight` rows already exist for a dataset
+version before computing anything; if they do, it returns them instead of recomputing. This
+is the same "generate once, reuse forever" pattern the analytics cache uses, but persisted
+(insights/alerts are shown across sessions, not just cached for one request's lifetime).
+
+# v1.0: Predictive Intelligence, Decision Intelligence, Executive Reporting, Production
+
+## Explainability: native feature importance, not SHAP
+
+`RandomForestClassifier.feature_importances_` / `LogisticRegression.coef_` give a
+deterministic, zero-extra-dependency explanation per prediction. SHAP adds real weight (its
+own package, per-model-type explainer selection, slower per-request) for marginal benefit on
+CSV-scale datasets — acceptable to revisit if a future model type needs it.
+
+## The ML service is internal-only and never touches Postgres
+
+`apps/ml-service` has no public port — only the Node API calls it, over the Docker-internal
+network in production. It's also stateless with respect to the database: Node resolves the
+dataset and derives all features itself (reusing the same `AnalyticsColumns`/aggregate
+helpers every other analytics service uses), sends clean numeric vectors over HTTP, and
+persists the result. Column detection and row-derivation logic is therefore never
+reimplemented in Python — the ML service only ever sees numbers, never raw rows.
+
+## Classical models, not deep learning
+
+Logistic Regression / Random Forest (churn), linear-trend + seasonal-naive blend (forecast),
+K-Means on RFM-style features (segmentation), popularity + content-similarity hybrid
+(recommendations). All train in milliseconds on CSV-scale data and degrade gracefully — a
+heuristic fallback, not a crash — on small samples, which a deep model would not.
+
+## Models train on demand, per dataset version, and are cached
+
+The first prediction request for a given `(organizationId, datasetVersionId, modelKey)`
+trains and persists a versioned model artifact plus a registry row; later requests for the
+same dataset version reuse it. The same "generate once per immutable dataset version"
+pattern as Sprint 3/4's analytics cache and Insight/Alert generation, applied to ML models —
+reused, not reinvented.
+
+## The Decision Intelligence Engine is deterministic, in TypeScript, not an LLM
+
+Every recommendation traces back to a concrete input (a root cause, an alert, a set of churn
+predictions) through a fixed template, so the same inputs always produce the same output —
+required for the engine to be explainable and testable with plain fixed-input/fixed-output
+unit tests. It lives in `apps/api`, not the ML service, because it needs direct access to
+`Insight`/`Alert`/`BenchmarkResult` rows already in Postgres via Prisma; it only crosses to
+the ML service for `Prediction` inputs, through the same `MlServiceClient` port the rest of
+the Node side uses.
+
+## DB-level dedup guards instead of in-process locks
+
+Sprint 4's `GenerateIntelligenceService`/`ensureDefaultBusinessRules` originally used an
+in-process `Map` to serialize concurrent "check count, then insert if zero" races — correct
+only for a single Node process. v1.0 introduces a stronger pattern instead: a real Postgres
+unique constraint (partial, where relevant — e.g. `business_rules(organizationId, name) WHERE
+isDefault`) plus `createMany({ skipDuplicates: true })`, so concurrent requests race harmlessly
+at the database level with no coordination code needed at all. `ensureDefaultBusinessRules`
+has been retrofitted to this pattern; `GenerateIntelligenceService`'s lock was left as-is,
+since it's still correct for the current single-API-container deployment and retrofitting it
+would touch two live tables' insert loops for limited benefit at this scale.
+
+This retrofit exists because of a real bug this exact class of race caused: a root cause and
+its corresponding recommendation could share similar title text (e.g. both about a revenue
+decline), and without `category` in `DecisionRecommendation`'s unique key, `skipDuplicates`
+silently dropped the second row as a false-positive duplicate of the first — found via live
+browser testing, not by any automated test, since the specific dataset used in the automated
+integration test didn't happen to produce a title collision. Fixed by widening the constraint
+to `(organizationId, datasetVersionId, category, title)` and giving recommendations wording
+distinct from their root cause.
+
+## Reports use native PDFKit vector charts, not a headless browser
+
+The existing `PdfKitReportGenerator` already drew tabular sections; v1.0 adds vector bar/line
+chart primitives directly in PDFKit (rects and lines from the same DTOs the dashboards
+render) instead of pulling in Puppeteer or a canvas library just to rasterize a chart image.
+
+## Production stack: one nginx entrypoint, no orchestration platform
+
+`docker-compose.prod.yml` publishes only nginx to the host; Postgres, the API, the web static
+bundle, and the ML service all stay on the internal Docker network. This is deliberately not
+Kubernetes/ECS/etc — the brief calls for "no unnecessary infra," and a single-host compose
+stack with one reverse proxy is the smallest thing that actually satisfies "only one port is
+publicly reachable" and "the ML service is internal-only" at once. Structured logging
+(pino) and rate limiting (`express-rate-limit`, in-memory) follow the same reasoning: real
+production hygiene without pulling in ELK or Redis for a workload that doesn't need them yet.
+
+Three real configuration bugs surfaced only by actually bringing the full compose stack up
+end-to-end, not by inspecting the Dockerfiles: a missing `.dockerignore` sent the entire
+monorepo (`node_modules` included) as build context, which then failed outright on a Windows
+npm-workspace symlink; the ML service's build context pointed at the repo root while its
+`COPY` paths are relative to its own directory; and the API's production image pruned the
+`prisma` CLI as a devDependency while still needing it to run `prisma migrate deploy` on
+boot (fixed by moving `prisma` to `dependencies` and addressing it by absolute path, since
+npm workspaces hoist it to the repo-root `node_modules`, not `apps/api/node_modules`). A
+fourth, in nginx's routing rather than Docker: `/health` and `/health/ready` live at the
+Express app root, not under `/api/v1`, so nginx's `/api/*`-only proxy rule was silently
+routing health checks to the SPA instead of the API. All four are fixed and reverified live.
+
+## Known accepted risk: dev-tooling-only npm audit findings (updated)
+
+The advisory set is unchanged in kind from Sprint 2 — `npm audit` still only flags
+`vite`/`vitest`/`esbuild`'s transitive dependency chain (dev/build tooling, not runtime
+code). `apps/ml-service`'s pip dependencies are a separate ecosystem `npm audit` doesn't
+cover; its `requirements.txt` (the prod image's runtime deps) deliberately excludes
+`pytest`/`httpx`, which live in `requirements-dev.txt` instead, so the prod image doesn't
+carry test tooling either way.

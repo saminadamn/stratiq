@@ -2,21 +2,27 @@
 
 Enterprise Business Intelligence & Decision Intelligence Platform.
 
-> **Status:** foundation only. This step scaffolds the monorepo, tooling, auth, RBAC,
-> and workspace (organization) model. No analytics, ETL, ML, or dashboard business logic
-> is implemented yet — see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the reasoning
-> behind each decision and what's intentionally deferred.
+> **Status:** v1.0. Multi-tenant auth/RBAC, dataset ETL, four analytics dashboards,
+> an Analytics Intelligence Layer (trends/benchmarks/business rules/insights/alerts),
+> Predictive Intelligence (churn/forecast/segmentation/recommendations), a deterministic
+> Decision Intelligence Engine, executive PDF reporting, and production Docker/nginx
+> deployment are all implemented. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for
+> the reasoning behind each decision.
 
 ## Stack
 
-| Layer    | Choice                                                |
-| -------- | ----------------------------------------------------- |
-| Frontend | React + TypeScript + Tailwind CSS (Vite)              |
-| Backend  | Express + TypeScript (Clean Architecture)             |
-| Database | PostgreSQL + Prisma ORM                               |
-| Auth     | JWT (access + refresh) with role-based access control |
-| Dev env  | Docker Compose                                        |
-| CI       | GitHub Actions (lint, typecheck, build)               |
+| Layer          | Choice                                                        |
+| -------------- | --------------------------------------------------------------- |
+| Frontend       | React + TypeScript + Tailwind CSS (Vite)                       |
+| Backend        | Express + TypeScript (Clean Architecture)                      |
+| ML service     | Python + FastAPI + scikit-learn (internal-only, called by the API) |
+| Database       | PostgreSQL + Prisma ORM                                        |
+| Auth           | JWT (access + refresh) with role-based access control          |
+| Logging        | pino (structured JSON)                                         |
+| Rate limiting  | express-rate-limit (global + stricter on login/signup)         |
+| Dev env        | Docker Compose                                                 |
+| Production     | Multi-stage Docker builds + nginx reverse proxy                |
+| CI             | GitHub Actions (lint, typecheck, test, build)                  |
 
 ## Monorepo layout
 
@@ -24,44 +30,99 @@ Enterprise Business Intelligence & Decision Intelligence Platform.
 StratIQ/
 ├── apps/
 │   ├── api/          # Express API, Clean Architecture layers
-│   └── web/          # React dashboard shell
+│   ├── web/           # React dashboard (auth, datasets, analytics, predictions, reports)
+│   └── ml-service/    # Python/FastAPI predictive models — internal-only, called by api
 ├── packages/
-│   └── shared/       # Types/DTOs shared between api and web
-├── docker/           # Dockerfiles + compose for local dev
-├── docs/             # Architecture Decision Records
-└── .github/workflows # CI
+│   └── shared/        # Types/DTOs shared between api and web
+├── docker/             # Dockerfiles, dev + prod compose, nginx config
+├── docs/               # Architecture Decision Records
+└── .github/workflows   # CI
 ```
 
 ## Prerequisites
 
 - Node.js 20+
-- Docker Desktop (for Postgres, and optionally the full stack)
+- Python 3.12+ (only needed to run `apps/ml-service` outside Docker)
+- Docker Desktop
 
-## Getting started
+## Getting started (local development)
 
 ```bash
 cp .env.example .env
 npm install
 
-# Start Postgres (and optionally api/web) via Docker
+# Start Postgres via Docker
 docker compose -f docker/docker-compose.yml up -d db
 
 # Generate the Prisma client and apply migrations
 npm run prisma:generate
 npm run prisma:migrate
 
-# Run api and web in separate terminals
+# Run the ML service (separate terminal — see apps/ml-service/README.md)
+cd apps/ml-service
+python -m venv .venv && .venv/Scripts/activate   # .venv/bin/activate on macOS/Linux
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --port 8000
+
+# Run api and web in separate terminals from the repo root
 npm run dev:api
 npm run dev:web
 ```
 
-Web runs at `http://localhost:5173`, API at `http://localhost:4000`.
+Web runs at `http://localhost:5173`, API at `http://localhost:4000`
+(Swagger UI at `http://localhost:4000/api/docs`), ML service at `http://localhost:8000`.
 
-To run the entire stack (db + api + web) in containers instead:
+To run db + api + web in containers instead (the ML service still runs on the
+host — the dev compose stack predates it):
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
+
+## Production deployment
+
+A separate compose stack builds every service's production Docker target
+(multi-stage: compiled/pruned Node output, a runtime-only Python image, an
+nginx-served static bundle) behind a single nginx reverse proxy. **Only
+nginx is published to the host** — Postgres, the API, the web static server,
+and the ML service all stay on the internal Docker network; the ML service
+in particular is never reachable from outside the API container.
+
+```bash
+cp .env.example .env   # fill in real JWT secrets — see below
+docker compose -f docker/docker-compose.prod.yml up --build -d
+```
+
+The stack serves on `http://localhost` (override with `HTTP_PORT` in `.env`).
+`api`'s container runs `prisma migrate deploy` automatically before starting,
+so pending migrations apply on every deploy without a separate migration
+step or job.
+
+**Before deploying to a real environment**, replace the placeholder JWT
+secrets in `.env` — `env.ts` refuses to boot with them when
+`NODE_ENV=production`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Health checks: `GET /health` (liveness — process is up) and
+`GET /health/ready` (readiness — pings Postgres and the ML service, returns
+503 if either is unreachable). Both are proxied through nginx at the repo
+root, e.g. `curl http://localhost/health/ready`.
+
+## Environment variables
+
+See [.env.example](.env.example) for the full list with explanations. The
+ones most likely to need changing per environment:
+
+| Variable                | Default                       | Purpose                                                        |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------- |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets |
+| `ML_SERVICE_URL`         | `http://localhost:8000`        | Where the API reaches the ML service (`http://ml-service:8000` in prod compose) |
+| `LOG_LEVEL`              | `info`                         | pino log level                                                 |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | `900000` / `300`  | Global API rate limit (login/signup have their own fixed, stricter limit) |
+| `HTTP_PORT`              | `80`                            | Host port nginx publishes (prod compose only)                  |
 
 ## Scripts (root)
 
@@ -69,21 +130,47 @@ docker compose -f docker/docker-compose.yml up --build
 - `npm run build` — build shared package, then api, then web (dependency order)
 - `npm run typecheck` — `tsc --noEmit` across all workspaces
 - `npm run lint` / `npm run format` — ESLint / Prettier across the repo
-- `npm run prisma:migrate` / `npm run prisma:seed` — database migrations & seed data
+- `npm run test` — backend unit + integration tests (Vitest); ML service tests are
+  run separately with `pytest` from `apps/ml-service`
+- `npm run prisma:migrate` / `npm run prisma:migrate:deploy` / `npm run prisma:seed`
+  — database migrations (interactive / non-interactive) & seed data
 
-## What's implemented in this step
+## What's implemented
 
-- Monorepo (npm workspaces) with strict, shared TypeScript config
-- ESLint (flat config) + Prettier, wired into CI
-- Dockerized Postgres + dev containers for api/web
-- Prisma schema: `User`, `Organization`, `Membership` (role), `RefreshToken`
-- JWT auth: signup, login, refresh (rotation), logout, `me`
-- RBAC middleware scoped to organization membership (`OWNER`/`ADMIN`/`MEMBER`/`VIEWER`)
-- Organization ("workspace") model — a user can belong to multiple organizations
-- A protected dashboard shell (sidebar/topbar, empty content area) proving the
-  auth flow end-to-end
+**Foundation** — multi-tenant auth (JWT access + rotating refresh tokens), RBAC scoped
+to organization membership, Clean Architecture backend, dataset upload/validation/cleaning
+ETL pipeline with immutable versioned snapshots.
 
-## What's explicitly out of scope for this step
+**Analytics** — Executive/Customer/Product/Inventory dashboards, a KPI engine, saved
+dashboard views, CSV/PDF/PNG export, and an Analytics Intelligence Layer (metrics registry,
+trend detection, benchmarking, configurable business rules, generated insights and alerts).
 
-Analytics, ETL/data ingestion, ML/scoring, and real dashboard widgets. These land
-once the foundation above is reviewed and accepted.
+**v1.0 — Predictive Intelligence** — a dedicated Python ML microservice (churn prediction,
+sales forecasting, customer segmentation, product recommendations) with a versioned model
+registry, a feature store, per-prediction explainability, and REST endpoints consumed by
+the Node API.
+
+**v1.0 — Decision Intelligence** — a deterministic engine (no LLM anywhere) that combines
+KPIs, insights, benchmarks, and predictions into root-cause analysis, prioritized
+recommendations with ROI estimates, and 30/60/90-day action plans.
+
+**v1.0 — Executive Reporting** — Executive Summary, KPI, Prediction, and Recommendation
+reports as PDFs with embedded vector charts, a download center, and report history.
+
+**v1.0 — Production readiness** — multi-stage Docker builds, a single-entrypoint nginx
+reverse proxy, liveness/readiness health checks, structured logging, API rate limiting,
+and environment validation that refuses to boot with placeholder secrets in production.
+
+## Testing
+
+```bash
+npm run test              # backend: 175+ unit + integration tests (Vitest, real Postgres)
+cd apps/ml-service && pytest   # ML service: unit + FastAPI integration tests
+```
+
+## Known limitations
+
+`npm audit` reports advisories against `vite`/`vitest`/`esbuild`'s transitive dev-tooling
+dependencies (not runtime application code) — see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-accepted-risk-dev-tooling-only-npm-audit-findings)
+for why these are tracked rather than force-upgraded within this scope.
