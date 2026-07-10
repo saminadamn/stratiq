@@ -5,8 +5,8 @@ type PDFDocument = InstanceType<typeof PDFDocumentClass>;
 
 const CHART_HEIGHT = 140;
 const AXIS_COLOR = '#94a3b8';
-const BAR_COLOR = '#4f46e5';
-const LINE_COLOR = '#4f46e5';
+const BAR_COLOR = '#0d9488'; // teal-600 — matches the app's brand accent
+const LINE_COLOR = '#0d9488';
 const LABEL_FONT_SIZE = 7;
 
 // Simple vector charts drawn directly with PDFKit's rect/line primitives —
