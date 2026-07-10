@@ -53,6 +53,13 @@ jobs:
       - name: Apply database migrations
         run: npm run prisma:migrate:deploy
 
+      # apps/api and apps/web resolve @stratiq/shared via its published
+      # dist/ output (see packages/shared/package.json's "main"/"types"),
+      # not TS project references, so it must be built before anything
+      # that typechecks or lints against it.
+      - name: Build shared package
+        run: npm run build -w @stratiq/shared
+
       - name: Lint
         run: npm run lint
 
