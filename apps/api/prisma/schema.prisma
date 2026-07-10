@@ -549,6 +549,12 @@ model MlModel {
 
   @@unique([organizationId, datasetVersionId, modelKey])
   @@index([organizationId, datasetVersionId])
+  // findByDatasetVersion queries by (datasetVersionId, modelKey) alone — a
+  // dataset version already belongs to exactly one organization, so
+  // organizationId isn't part of that lookup. Without this, the query can
+  // only use the two indexes above by scanning them in full, since neither
+  // leads with datasetVersionId.
+  @@index([datasetVersionId, modelKey])
   @@map("ml_models")
 }
 
@@ -570,6 +576,9 @@ model MlFeatureSnapshot {
 
   @@unique([organizationId, datasetVersionId, entityType, entityId])
   @@index([organizationId, datasetVersionId, entityType])
+  // findByDatasetVersion queries by (datasetVersionId, entityType) alone —
+  // same reasoning as MlModel's extra index above.
+  @@index([datasetVersionId, entityType])
   @@map("ml_feature_snapshots")
 }
 
@@ -596,6 +605,9 @@ model Prediction {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, datasetVersionId, modelKey])
+  // findByDatasetVersion queries by (datasetVersionId, modelKey) alone —
+  // same reasoning as MlModel's extra index above.
+  @@index([datasetVersionId, modelKey])
   @@map("predictions")
 }
 
