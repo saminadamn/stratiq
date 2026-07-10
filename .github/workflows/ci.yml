@@ -44,6 +44,35 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: apps/ml-service/.python-version
+          cache: pip
+          cache-dependency-path: apps/ml-service/requirements.txt
+
+      - name: Install ML service dependencies
+        run: pip install -r requirements.txt
+        working-directory: apps/ml-service
+
+      # The v1.0 predictions/decisions/reports integration test hits a real
+      # running ML service (see v1-predictions-flow.test.ts) rather than
+      # mocking it, so it needs to actually be up before the Test step.
+      - name: Start ML service
+        run: |
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > ml-service.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "ML service is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ML service failed to start"
+          cat ml-service.log
+          exit 1
+        working-directory: apps/ml-service
+
       - name: Install dependencies
         run: npm ci
 
