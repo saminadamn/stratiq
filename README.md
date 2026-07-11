@@ -9,27 +9,31 @@
 Enterprise Business Intelligence & Decision Intelligence Platform. See
 [CHANGELOG.md](CHANGELOG.md) for what shipped in each phase.
 
-> **Status:** v1.0. Multi-tenant auth/RBAC, dataset ETL, four analytics dashboards,
+> **Status:** v1.1. Multi-tenant auth/RBAC, dataset ETL, four analytics dashboards,
 > an Analytics Intelligence Layer (trends/benchmarks/business rules/insights/alerts),
 > Predictive Intelligence (churn/forecast/segmentation/recommendations), a deterministic
-> Decision Intelligence Engine, executive PDF reporting, and production Docker/nginx
-> deployment are all implemented. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for
-> the reasoning behind each decision.
+> Decision Intelligence Engine, executive PDF reporting, production Docker/nginx
+> deployment, and an optional distributed-systems path (Redis caching/rate-limiting, a
+> BullMQ report queue, correlation-ID/`/metrics` observability) are all implemented. See
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the reasoning behind each decision.
 
 ## Stack
 
-| Layer         | Choice                                                             |
-| ------------- | ------------------------------------------------------------------ |
-| Frontend      | React + TypeScript + Tailwind CSS (Vite)                           |
-| Backend       | Express + TypeScript (Clean Architecture)                          |
-| ML service    | Python + FastAPI + scikit-learn (internal-only, called by the API) |
-| Database      | PostgreSQL + Prisma ORM                                            |
-| Auth          | JWT (access + refresh) with role-based access control              |
-| Logging       | pino (structured JSON)                                             |
-| Rate limiting | express-rate-limit (global + stricter on login/signup)             |
-| Dev env       | Docker Compose                                                     |
-| Production    | Multi-stage Docker builds + nginx reverse proxy                    |
-| CI            | GitHub Actions (lint, typecheck, test, build)                      |
+| Layer         | Choice                                                                  |
+| ------------- | ----------------------------------------------------------------------- |
+| Frontend      | React + TypeScript + Tailwind CSS (Vite)                                |
+| Backend       | Express + TypeScript (Clean Architecture)                               |
+| ML service    | Python + FastAPI + scikit-learn (internal-only, called by the API)      |
+| Database      | PostgreSQL + Prisma ORM                                                 |
+| Auth          | JWT (access + refresh) with role-based access control                   |
+| Logging       | pino (structured JSON), correlation IDs via child loggers               |
+| Rate limiting | express-rate-limit (in-memory, or Redis-backed when `REDIS_URL` is set) |
+| Caching       | In-memory, or Redis-backed when `REDIS_URL` is set                      |
+| Job queue     | BullMQ (Redis), with an in-process fallback — see ADR 0007              |
+| Metrics       | `prom-client` at `GET /metrics` (Prometheus exposition format)          |
+| Dev env       | Docker Compose (optional `redis` service)                               |
+| Production    | Multi-stage Docker builds + nginx reverse proxy                         |
+| CI            | GitHub Actions (lint, typecheck, test, build)                           |
 
 ## Monorepo layout
 
@@ -140,6 +144,7 @@ erDiagram
         string organizationId FK
         string generatedById FK
         enum type
+        enum status
     }
 ```
 
@@ -152,13 +157,16 @@ takes an `organizationId`) rather than relying on row-level security alone.
 Full reasoning lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the
 biggest single-topic decisions have their own ADRs:
 
-| Decision                                                                 | Why                                                                                                                  |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| [Clean Architecture layering](docs/adr/0001-clean-architecture.md)       | Business logic testable without a database; ORM/framework swappable without touching use cases                       |
-| [PostgreSQL, not a separate document store](docs/adr/0002-postgresql.md) | One database for both strictly-relational (auth/RBAC) and semi-structured (dataset rows, ML features) data via JSONB |
-| [Prisma as the ORM](docs/adr/0003-prisma.md)                             | Compile-time-safe queries, generated migrations, isolated entirely inside `infrastructure/persistence/`              |
-| [FastAPI for the ML service](docs/adr/0004-fastapi-ml-service.md)        | Pydantic validation + free OpenAPI docs; kept as its own internal-only process, not embedded in the Node API         |
-| [No LLMs in Decision Intelligence](docs/adr/0005-no-llms.md)             | Fixed-template recommendations are reproducible and unit-testable — same inputs always produce the same output       |
+| Decision                                                                            | Why                                                                                                                  |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [Clean Architecture layering](docs/adr/0001-clean-architecture.md)                  | Business logic testable without a database; ORM/framework swappable without touching use cases                       |
+| [PostgreSQL, not a separate document store](docs/adr/0002-postgresql.md)            | One database for both strictly-relational (auth/RBAC) and semi-structured (dataset rows, ML features) data via JSONB |
+| [Prisma as the ORM](docs/adr/0003-prisma.md)                                        | Compile-time-safe queries, generated migrations, isolated entirely inside `infrastructure/persistence/`              |
+| [FastAPI for the ML service](docs/adr/0004-fastapi-ml-service.md)                   | Pydantic validation + free OpenAPI docs; kept as its own internal-only process, not embedded in the Node API         |
+| [No LLMs in Decision Intelligence](docs/adr/0005-no-llms.md)                        | Fixed-template recommendations are reproducible and unit-testable — same inputs always produce the same output       |
+| [Redis caching and rate limiting](docs/adr/0006-redis-caching-and-rate-limiting.md) | In-memory cache/rate-limit state is silently wrong once the API runs on more than one instance                       |
+| [BullMQ job queue for reports](docs/adr/0007-bullmq-job-queue.md)                   | Report generation is the slowest synchronous request path; queued with a graceful in-process fallback                |
+| [Observability without a monitoring stack](docs/adr/0008-observability.md)          | Correlation IDs + `/metrics` + a Redis readiness check — real instrumentation, deliberately no Prometheus/Grafana    |
 
 ## Prerequisites
 
@@ -192,6 +200,19 @@ npm run dev:web
 
 Web runs at `http://localhost:5173`, API at `http://localhost:4000`
 (Swagger UI at `http://localhost:4000/api/docs`), ML service at `http://localhost:8000`.
+
+**Optional: Redis.** Everything above works with no Redis at all — the
+analytics cache, rate limiter, and report generation all fall back to
+single-process behavior. To try the distributed path locally:
+
+```bash
+docker compose -f docker/docker-compose.yml up -d redis
+# add to .env: REDIS_URL=redis://localhost:6379
+```
+
+Report generation then runs through a real BullMQ queue instead of
+`setImmediate`; `npm run dev:worker` runs a standalone worker process if
+you also want to see `WORKER_MODE=standalone` in action.
 
 To run db + api + web in containers instead (the ML service still runs on the
 host — the dev compose stack predates it):
@@ -228,22 +249,41 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
 Health checks: `GET /health` (liveness — process is up) and
-`GET /health/ready` (readiness — pings Postgres and the ML service, returns
-503 if either is unreachable). Both are proxied through nginx at the repo
-root, e.g. `curl http://localhost/health/ready`.
+`GET /health/ready` (readiness — pings Postgres, the ML service, and Redis
+if configured; returns 503 if a _required_ dependency is unreachable — an
+unconfigured Redis is reported but never fails readiness, since every
+Redis-backed feature has a working fallback, see below). Both are proxied
+through nginx at the repo root, e.g. `curl http://localhost/health/ready`.
+
+**Redis (optional).** The prod compose stack includes a `redis` service and
+a dedicated `worker` container that consumes the report-generation queue
+(see [ADR 0007](docs/adr/0007-bullmq-job-queue.md)). Neither is required —
+leaving `REDIS_URL` unset makes the API behave exactly as it does without
+this stack section at all: in-memory analytics cache, in-memory rate
+limiting, synchronous report generation. On a single free-tier host (e.g.
+Render, with no separate background-worker product), set `REDIS_URL` to a
+managed Redis (Upstash's free tier works well — use the `rediss://` URL)
+and leave `WORKER_MODE` unset (defaults to `embedded`), so the one deployed
+API process both serves HTTP and consumes the report queue. The tradeoff:
+a free-tier instance that spins down on idle can leave an in-flight report
+stalled until the next request wakes it — switching to a paid host with a
+dedicated worker (`WORKER_MODE=standalone`) removes that limitation.
 
 ## Environment variables
 
 See [.env.example](.env.example) for the full list with explanations. The
 ones most likely to need changing per environment:
 
-| Variable                                   | Default                                         | Purpose                                                                         |
-| ------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets                                        |
-| `ML_SERVICE_URL`                           | `http://localhost:8000`                         | Where the API reaches the ML service (`http://ml-service:8000` in prod compose) |
-| `LOG_LEVEL`                                | `info`                                          | pino log level                                                                  |
-| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`  | `900000` / `300`                                | Global API rate limit (login/signup have their own fixed, stricter limit)       |
-| `HTTP_PORT`                                | `80`                                            | Host port nginx publishes (prod compose only)                                   |
+| Variable                                   | Default                                         | Purpose                                                                                     |
+| ------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets                                                    |
+| `ML_SERVICE_URL`                           | `http://localhost:8000`                         | Where the API reaches the ML service (`http://ml-service:8000` in prod compose)             |
+| `LOG_LEVEL`                                | `info`                                          | pino log level                                                                              |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`  | `900000` / `300`                                | Global API rate limit (login/signup have their own fixed, stricter limit)                   |
+| `HTTP_PORT`                                | `80`                                            | Host port nginx publishes (prod compose only)                                               |
+| `REDIS_URL`                                | unset                                           | Enables the distributed path (cache/rate-limit/queue) — see ADR 0006/0007                   |
+| `REDIS_CACHE_TTL_SECONDS`                  | `86400`                                         | Memory-hygiene TTL on Redis-backed analytics cache entries (not a correctness knob)         |
+| `WORKER_MODE`                              | `embedded`                                      | `embedded` runs the report worker in-process; `standalone` for a dedicated worker container |
 
 ## Security
 
@@ -276,9 +316,29 @@ What's actually implemented, not a wishlist:
 Bearer-token API (no cookie-based session), which is the class of attack
 CSRF tokens exist to prevent. Not applicable here rather than skipped.
 
+## Observability
+
+Real instrumentation, deliberately without a Prometheus/Grafana stack (see
+[ADR 0008](docs/adr/0008-observability.md) for the tradeoff):
+
+- **Correlation IDs** — every response carries an `X-Request-Id` header
+  (generated, or passed through from an upstream proxy); the same ID is
+  bound to every log line that request produces via a pino child logger,
+  and is included in any 500 response body so a user can hand it to
+  support without needing log access.
+- **`GET /metrics`** — Prometheus exposition format: default Node process
+  metrics, HTTP request duration/count labeled by route pattern (never raw
+  interpolated paths — bounded cardinality), and BullMQ report-queue depth
+  by state when Redis is configured. Unauthenticated by design; exposes
+  only aggregate counts, never request/response bodies.
+- **`GET /health/ready`** — now includes a `redis` field
+  (`true`/`false`/`'not_configured'`) alongside `database`/`mlService`.
+
 ## Scripts (root)
 
-- `npm run dev:api` / `npm run dev:web` — run a single app in watch mode
+- `npm run dev:api` / `npm run dev:web` / `npm run dev:worker` — run a
+  single process in watch mode (`dev:worker` only does anything useful
+  once `REDIS_URL` is set — see [ADR 0007](docs/adr/0007-bullmq-job-queue.md))
 - `npm run build` — build shared package, then api, then web (dependency order)
 - `npm run typecheck` — `tsc --noEmit` across all workspaces
 - `npm run lint` / `npm run format` — ESLint / Prettier across the repo

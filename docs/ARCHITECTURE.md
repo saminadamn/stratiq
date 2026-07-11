@@ -271,3 +271,41 @@ code). `apps/ml-service`'s pip dependencies are a separate ecosystem `npm audit`
 cover; its `requirements.txt` (the prod image's runtime deps) deliberately excludes
 `pytest`/`httpx`, which live in `requirements-dev.txt` instead, so the prod image doesn't
 carry test tooling either way.
+
+# v1.1: Distributed Systems Showcase
+
+The v1.0 production-stack section above says real hygiene "without pulling in ... Redis
+for a workload that doesn't need them yet" — that was correct for a single-instance
+deployment. v1.1 is the deliberate next step once "what if this ran on more than one
+instance" became the actual question: Redis-backed caching and rate limiting (ADR 0006),
+a BullMQ job queue for report generation (ADR 0007), and correlation-ID/`/metrics`
+observability (ADR 0008). Full reasoning lives in those three ADRs; this section is just
+the connective tissue.
+
+## One env var gates the entire distributed path
+
+`REDIS_URL` unset and every v1.1 feature behaves exactly as it did in v1.0 — in-memory
+cache, in-memory rate limiter, synchronous report generation. Setting it switches all
+three at once, in `composition-root.ts`. Deliberately not three separate feature flags:
+a partially-distributed process (Redis cache, but still in-memory rate limiting) isn't a
+real deployment topology anyone would choose, so there's no reason to let the three drift
+independently.
+
+## Report generation moved off the request path entirely
+
+This is the one v1.1 change with an observable API contract shift: `POST
+/reports/generate` returns `202` with a `PENDING` row instead of `201` with a finished
+report. The old `GenerateReportUseCase` is gone, split into `EnqueueReportUseCase`
+(creates the row, hands off a job) and `ProcessReportJobService` (the actual PDF work,
+run by whichever worker — embedded, standalone, or the in-process fallback — picks the
+job up). Existing integration tests had to change from asserting immediate completion to
+polling `GET /reports` until the row settles.
+
+## Worker topology: embedded by default, standalone as the real showcase
+
+`WORKER_MODE=embedded` (default) runs the BullMQ `Worker` inside the API process itself,
+because that's the only option that works on a single free-tier PaaS service with no
+separate background-worker product. `WORKER_MODE=standalone`, used by the dedicated
+`worker` container in both compose files, is the actual "independently scalable process"
+demonstration — multiple standalone workers consuming one queue concurrently is BullMQ's
+normal scaling behavior, not a special mode.

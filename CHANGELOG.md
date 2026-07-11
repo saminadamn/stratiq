@@ -3,6 +3,30 @@
 This project doesn't (yet) use tagged GitHub releases — this file tracks
 the same milestones by what shipped, grouped the way the sprints were run.
 
+## v1.1 — Distributed Systems Showcase
+
+- **Redis-backed caching**: `RedisAnalyticsCache` behind the existing
+  `AnalyticsCache` port, selected automatically when `REDIS_URL` is set —
+  falls back to the original in-memory cache otherwise (see
+  `docs/adr/0006-redis-caching-and-rate-limiting.md`).
+- **Redis-backed rate limiting**: `rate-limit-redis` fixes a real
+  correctness gap — the previous in-memory limiter silently multiplied
+  its effective limit across horizontally-scaled instances.
+- **Async report generation via BullMQ**: `POST /reports/generate` now
+  returns `202` with a `PENDING` report immediately; a worker (embedded
+  in the API process by default, or a dedicated `worker` container via
+  `WORKER_MODE=standalone`) processes the queue and updates the report to
+  `COMPLETE`/`FAILED`. Falls back to an in-process queue with no Redis
+  configured — the API contract is identical either way (see
+  `docs/adr/0007-bullmq-job-queue.md`).
+- **Observability**: request correlation IDs (`X-Request-Id` + pino child
+  loggers), a Prometheus-format `GET /metrics` endpoint, and a `redis`
+  field on `GET /health/ready` — deliberately without a Prometheus/Grafana
+  stack (see `docs/adr/0008-observability.md`).
+- Frontend: report status badges and polling on the Reports page.
+- Every feature above is additive and optional — `REDIS_URL` unset keeps
+  the app behaving exactly as it did in v1.0.
+
 ## v1.0 — Predictive & Decision Intelligence, Production Readiness
 
 - **Predictive Intelligence**: Python/FastAPI ML microservice — churn
