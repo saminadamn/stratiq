@@ -9,7 +9,9 @@ export class ListReportsUseCase {
     return reports.map((report) => ({
       id: report.id,
       type: report.type,
+      status: report.status,
       fileName: report.fileName,
+      errorMessage: report.errorMessage,
       generatedAt: report.generatedAt.toISOString(),
       generatedBy: { id: report.generatedById, name: report.generatedByName },
     }));

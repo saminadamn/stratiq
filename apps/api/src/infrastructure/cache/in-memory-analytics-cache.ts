@@ -15,12 +15,12 @@ export class InMemoryAnalyticsCache implements AnalyticsCache {
 
   constructor(private readonly maxEntries: number = DEFAULT_MAX_ENTRIES) {}
 
-  get<T>(key: string): T | undefined {
+  async get<T>(key: string): Promise<T | undefined> {
     const entry = this.store.get(key);
     return entry ? (entry.value as T) : undefined;
   }
 
-  set<T>(key: string, value: T): void {
+  async set<T>(key: string, value: T): Promise<void> {
     if (!this.store.has(key) && this.store.size >= this.maxEntries) {
       const oldestKey = this.store.keys().next().value;
       if (oldestKey !== undefined) {

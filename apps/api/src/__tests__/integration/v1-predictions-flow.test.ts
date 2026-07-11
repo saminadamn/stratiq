@@ -64,6 +64,11 @@ describe('v1.0 Predictions/Decisions/Reports API (integration)', () => {
   }, 30000);
 
   afterAll(async () => {
+    // v1.1: createServer() starts an embedded BullMQ worker whenever
+    // REDIS_URL is set — closing it here (once per test file) stops
+    // multiple test files' workers from accumulating and contending for
+    // the same report-generation queue across the whole suite run.
+    await server.worker?.close();
     await request(server.app)
       .delete(`/api/v1/organizations/${organizationId}/datasets/${datasetId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -161,14 +166,36 @@ describe('v1.0 Predictions/Decisions/Reports API (integration)', () => {
     }
   });
 
+  // v1.1: report generation is queued (see EnqueueReportUseCase /
+  // ProcessReportJobService), not synchronous, so the request returns
+  // PENDING immediately and the test has to poll until a worker (embedded
+  // in createServer(), see composition-root.ts) flips it to COMPLETE.
   it('generates, lists, and downloads all four report types', async () => {
     for (const type of ['EXECUTIVE_SUMMARY', 'KPI', 'PREDICTION', 'RECOMMENDATION']) {
       const generateResponse = await request(server.app)
         .post(`/api/v1/organizations/${organizationId}/reports/generate`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ type })
-        .expect(201);
+        .expect(202);
       expect(generateResponse.body.type).toBe(type);
+      expect(generateResponse.body.status).toBe('PENDING');
+
+      let status = generateResponse.body.status;
+      for (let attempt = 0; attempt < 80 && status !== 'COMPLETE'; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const listResponse = await request(server.app)
+          .get(`/api/v1/organizations/${organizationId}/reports`)
+          .set('Authorization', `Bearer ${accessToken}`)
+          .expect(200);
+        const report = listResponse.body.reports.find(
+          (r: { id: string }) => r.id === generateResponse.body.id,
+        );
+        status = report?.status;
+        if (status === 'FAILED') {
+          throw new Error(`Report generation failed: ${report?.errorMessage}`);
+        }
+      }
+      expect(status).toBe('COMPLETE');
 
       const downloadResponse = await request(server.app)
         .get(`/api/v1/organizations/${organizationId}/reports/${generateResponse.body.id}/download`)
@@ -183,7 +210,7 @@ describe('v1.0 Predictions/Decisions/Reports API (integration)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(listResponse.body.reports.length).toBe(4);
-  }, 20000);
+  }, 40000);
 
   it('rejects requests without a valid access token', async () => {
     await request(server.app)

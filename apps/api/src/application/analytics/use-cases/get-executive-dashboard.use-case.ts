@@ -42,7 +42,7 @@ export class GetExecutiveDashboardUseCase {
     );
 
     const cacheKey = buildAnalyticsCacheKey(context.datasetVersionId, CACHE_SCOPE, filters);
-    const cached = this.cache.get<ExecutiveDashboardDto>(cacheKey);
+    const cached = await this.cache.get<ExecutiveDashboardDto>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -92,7 +92,7 @@ export class GetExecutiveDashboardUseCase {
       datasetVersionId: context.datasetVersionId,
     };
 
-    this.cache.set(cacheKey, dashboard);
+    await this.cache.set(cacheKey, dashboard);
     return dashboard;
   }
 }

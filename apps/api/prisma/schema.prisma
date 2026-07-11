@@ -668,22 +668,42 @@ enum ReportType {
   RECOMMENDATION
 }
 
-// One row per generated PDF — the "Report History" / "Download Center" is
+// v1.1 (Distributed Systems Showcase). PENDING/PROCESSING exist because
+// generation moved off the request path onto a queue (see
+// docs/adr/0007-bullmq-job-queue.md) — a row is now created the moment a
+// report is *requested*, before the file exists, not just once generation
+// succeeds.
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+// One row per requested PDF — the "Report History" / "Download Center" is
 // just this table plus LocalFileStorage, the same split already used for
 // uploaded datasets (metadata in Postgres, bytes on disk by path).
 model Report {
-  id               String     @id @default(cuid())
+  id               String       @id @default(cuid())
   organizationId   String
   datasetVersionId String
   type             ReportType
-  fileName         String
-  storagePath      String
+  // Defaults to COMPLETE: every row created before this migration finished
+  // generation synchronously, so backfilling that status is simply correct,
+  // not a placeholder. New rows always pass an explicit status at creation.
+  status           ReportStatus @default(COMPLETE)
+  // Unknown until the async job finishes — null while PENDING/PROCESSING.
+  fileName         String?
+  storagePath      String?
+  errorMessage     String?
   generatedById    String
-  generatedAt      DateTime   @default(now())
+  generatedAt      DateTime     @default(now())
+  completedAt      DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   generatedBy  User         @relation(fields: [generatedById], references: [id])
 
   @@index([organizationId, generatedAt])
+  @@index([organizationId, status])
   @@map("reports")
 }

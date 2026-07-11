@@ -31,7 +31,7 @@ export class GetRevenueAnalyticsUseCase {
     );
 
     const cacheKey = buildAnalyticsCacheKey(context.datasetVersionId, CACHE_SCOPE, filters);
-    const cached = this.cache.get<RevenueAnalyticsDto>(cacheKey);
+    const cached = await this.cache.get<RevenueAnalyticsDto>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -45,7 +45,7 @@ export class GetRevenueAnalyticsUseCase {
       datasetId: context.datasetId,
       datasetVersionId: context.datasetVersionId,
     };
-    this.cache.set(cacheKey, result);
+    await this.cache.set(cacheKey, result);
     return result;
   }
 }

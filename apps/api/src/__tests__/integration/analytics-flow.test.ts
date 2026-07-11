@@ -52,6 +52,11 @@ describe('Analytics API (integration)', () => {
   });
 
   afterAll(async () => {
+    // v1.1: createServer() starts an embedded BullMQ worker whenever
+    // REDIS_URL is set — closing it here (once per test file) stops
+    // multiple test files' workers from accumulating and contending for
+    // the same report-generation queue across the whole suite run.
+    await server.worker?.close();
     await request(server.app)
       .delete(`/api/v1/organizations/${organizationId}/datasets/${datasetId}`)
       .set('Authorization', `Bearer ${accessToken}`);
@@ -72,6 +77,27 @@ describe('Analytics API (integration)', () => {
     expect(response.body.totalOrders).toBe(4);
     expect(response.body.activeCustomers).toBe(3);
     expect(response.body.topProducts.length).toBeGreaterThan(0);
+  });
+
+  // v1.1 (Distributed Systems Showcase): every response carries a
+  // correlation ID (see request-id.middleware.ts), and /metrics exposes
+  // Prometheus exposition text without needing a full monitoring stack.
+  it('tags every response with an X-Request-Id header', async () => {
+    const response = await request(server.app)
+      .get(`/api/v1/organizations/${organizationId}/analytics/kpis`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(response.headers['x-request-id']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it('exposes Prometheus-format metrics at /metrics', async () => {
+    const response = await request(server.app).get('/metrics').expect(200);
+
+    expect(response.headers['content-type']).toContain('text/plain');
+    expect(response.text).toContain('http_requests_total');
   });
 
   it('returns revenue analytics with a monthly trend and category/region breakdowns', async () => {

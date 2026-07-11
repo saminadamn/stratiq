@@ -45,14 +45,23 @@ export function createErrorHandlerMiddleware(logger: Logger) {
       return;
     }
 
-    logger.error('Unhandled request error', {
+    // req.logger carries the request's correlation ID automatically (see
+    // request-id.middleware.ts) — falls back to the base logger for errors
+    // thrown before that middleware runs.
+    (req.logger ?? logger).error('Unhandled request error', {
       method: req.method,
       path: req.path,
       error:
         err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
     });
     res.status(500).json({
-      error: { code: 'INTERNAL_SERVER_ERROR', message: 'Something went wrong.' },
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Something went wrong.',
+        // Included so a user can hand this to support without needing log
+        // access themselves — traces straight back to the log line above.
+        requestId: req.id,
+      },
     });
   };
 }

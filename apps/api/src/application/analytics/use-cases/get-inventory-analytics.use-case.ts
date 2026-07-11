@@ -30,7 +30,7 @@ export class GetInventoryAnalyticsUseCase {
     );
 
     const cacheKey = buildAnalyticsCacheKey(context.datasetVersionId, CACHE_SCOPE, filters);
-    const cached = this.cache.get<InventoryDashboardDto>(cacheKey);
+    const cached = await this.cache.get<InventoryDashboardDto>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -41,7 +41,7 @@ export class GetInventoryAnalyticsUseCase {
       datasetId: context.datasetId,
       datasetVersionId: context.datasetVersionId,
     };
-    this.cache.set(cacheKey, result);
+    await this.cache.set(cacheKey, result);
     return result;
   }
 }

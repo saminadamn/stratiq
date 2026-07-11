@@ -43,6 +43,19 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # v1.1 (Distributed Systems Showcase). Optional, same as the dev compose —
+  # api/worker degrade to single-process behavior without it.
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - stratiq_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build:
       context: ..
@@ -54,12 +67,43 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-stratiq}:${POSTGRES_PASSWORD:-stratiq_dev_password}@db:5432/${POSTGRES_DB:-stratiq}?schema=public
       ML_SERVICE_URL: http://ml-service:8000
+      REDIS_URL: redis://redis:6379
+      # A dedicated `worker` container below consumes the report queue in
+      # this stack, so the API itself shouldn't also compete for jobs.
+      WORKER_MODE: standalone
     volumes:
       - stratiq_storage:/app/apps/api/storage
     depends_on:
       db:
         condition: service_healthy
       ml-service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+      target: prod
+    command: ['node', 'dist/worker.js']
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stratiq}:${POSTGRES_PASSWORD:-stratiq_dev_password}@db:5432/${POSTGRES_DB:-stratiq}?schema=public
+      ML_SERVICE_URL: http://ml-service:8000
+      REDIS_URL: redis://redis:6379
+      WORKER_MODE: standalone
+    volumes:
+      - stratiq_storage:/app/apps/api/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -87,3 +131,4 @@ volumes:
   stratiq_postgres_data_prod:
   stratiq_model_store:
   stratiq_storage:
+  stratiq_redis_data:

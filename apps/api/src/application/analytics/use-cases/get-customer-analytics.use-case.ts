@@ -30,7 +30,7 @@ export class GetCustomerAnalyticsUseCase {
     );
 
     const cacheKey = buildAnalyticsCacheKey(context.datasetVersionId, CACHE_SCOPE, filters);
-    const cached = this.cache.get<CustomerDashboardDto>(cacheKey);
+    const cached = await this.cache.get<CustomerDashboardDto>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -41,7 +41,7 @@ export class GetCustomerAnalyticsUseCase {
       datasetId: context.datasetId,
       datasetVersionId: context.datasetVersionId,
     };
-    this.cache.set(cacheKey, result);
+    await this.cache.set(cacheKey, result);
     return result;
   }
 }

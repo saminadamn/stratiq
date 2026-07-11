@@ -55,6 +55,11 @@ describe('Intelligence API (integration)', () => {
   });
 
   afterAll(async () => {
+    // v1.1: createServer() starts an embedded BullMQ worker whenever
+    // REDIS_URL is set — closing it here (once per test file) stops
+    // multiple test files' workers from accumulating and contending for
+    // the same report-generation queue across the whole suite run.
+    await server.worker?.close();
     await request(server.app)
       .delete(`/api/v1/organizations/${organizationId}/datasets/${datasetId}`)
       .set('Authorization', `Bearer ${accessToken}`);

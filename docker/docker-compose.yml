@@ -24,6 +24,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # v1.1 (Distributed Systems Showcase). `profiles` keeps both of these out
+  # of a bare `docker compose up` — api/worker fall back to single-process
+  # behavior (in-memory cache/rate-limit, synchronous report generation)
+  # if REDIS_URL isn't set, so neither service is needed by default. Start
+  # explicitly with `docker compose up -d redis` (works even without
+  # activating the profile — naming a service directly always starts it),
+  # or `docker compose --profile distributed up` for the whole distributed
+  # stack including the standalone worker.
+  redis:
+    image: redis:7-alpine
+    profiles: ['distributed']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: ..
@@ -47,6 +66,38 @@ services:
       db:
         condition: service_healthy
     command: npm run dev:api
+
+  # Standalone report-generation worker — the true "separate, independently
+  # scalable process" showcase (see docs/adr/0007-bullmq-job-queue.md). The
+  # `api` service above also runs an embedded worker by default
+  # (WORKER_MODE=embedded), so this container isn't required for reports to
+  # work locally; it demonstrates the multi-worker topology explicitly.
+  # Requires Redis (createWorker() refuses to boot without REDIS_URL), so
+  # it shares the `distributed` profile and sets REDIS_URL itself rather
+  # than relying on `.env`, since it's meaningless without it.
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    profiles: ['distributed']
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stratiq}:${POSTGRES_PASSWORD:-stratiq_dev_password}@db:5432/${POSTGRES_DB:-stratiq}?schema=public
+      REDIS_URL: redis://redis:6379
+      WORKER_MODE: standalone
+    volumes:
+      - ..:/app
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      - /app/apps/web/node_modules
+      - /app/packages/shared/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run dev:worker
 
   web:
     build:

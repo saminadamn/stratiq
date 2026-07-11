@@ -11,6 +11,7 @@
   "scripts": {
     "dev:api": "npm run build -w @stratiq/shared && npm run dev -w @stratiq/api",
     "dev:web": "npm run build -w @stratiq/shared && npm run dev -w @stratiq/web",
+    "dev:worker": "npm run build -w @stratiq/shared && npm run worker:dev -w @stratiq/api",
     "build": "npm run build -w @stratiq/shared && npm run build -w @stratiq/api && npm run build -w @stratiq/web",
     "typecheck": "npm run typecheck -w @stratiq/shared && npm run typecheck -w @stratiq/api && npm run typecheck -w @stratiq/web",
     "lint": "eslint .",

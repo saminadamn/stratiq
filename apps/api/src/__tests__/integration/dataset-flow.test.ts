@@ -35,6 +35,11 @@ describe('Dataset ETL flow (integration)', () => {
   });
 
   afterAll(async () => {
+    // v1.1: createServer() starts an embedded BullMQ worker whenever
+    // REDIS_URL is set — closing it here (once per test file) stops
+    // multiple test files' workers from accumulating and contending for
+    // the same report-generation queue across the whole suite run.
+    await server.worker?.close();
     // Best-effort cleanup so repeated local runs against the same dev
     // database don't accumulate test orgs/users indefinitely.
     await server.prisma.membership.deleteMany({ where: { organizationId } });

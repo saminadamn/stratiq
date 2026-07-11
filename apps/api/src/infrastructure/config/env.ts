@@ -45,6 +45,18 @@ const envSchema = z
       .positive()
       .default(15 * 60 * 1000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+
+    // v1.1 (Distributed Systems Showcase). Unset by default — every
+    // Redis-backed feature (analytics cache, rate-limit store, report
+    // queue) falls back to its single-process equivalent when REDIS_URL is
+    // absent, so local dev and a Redis-less deploy keep working unchanged.
+    REDIS_URL: z.string().optional(),
+    REDIS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(86400),
+    // "embedded" runs the report-generation worker inside this process —
+    // the only option that works on a single free-tier PaaS service.
+    // "standalone" is for the dedicated `worker` container in
+    // docker-compose, which lets the API stop double-consuming the queue.
+    WORKER_MODE: z.enum(['embedded', 'standalone']).default('embedded'),
   })
   .superRefine((env, ctx) => {
     // Fails fast at boot rather than letting a copy-pasted .env.example ever

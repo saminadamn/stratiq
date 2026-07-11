@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Store } from 'express-rate-limit';
 import type multer from 'multer';
 import { createAnalyticsRoutes } from './analytics.routes.js';
 import { createAuthRoutes } from './auth.routes.js';
@@ -37,13 +38,15 @@ export interface ApiRoutesDeps {
   reports: ReportsControllerDeps;
   tokenService: TokenService;
   membershipRepository: MembershipRepository;
+  // v1.1 (Distributed Systems Showcase). See rate-limit.middleware.ts.
+  authRateLimitStore?: Store;
 }
 
 // v1 prefix from the start: a foundation meant to last should never have to
 // retrofit versioning onto URLs already in use by a frontend or third party.
 export function createApiRouter(deps: ApiRoutesDeps): Router {
   const router = Router();
-  router.use('/auth', createAuthRoutes(deps.auth, deps.tokenService));
+  router.use('/auth', createAuthRoutes(deps.auth, deps.tokenService, deps.authRateLimitStore));
   router.use(
     '/organizations',
     createOrganizationRoutes(deps.organizations, deps.tokenService, deps.membershipRepository),

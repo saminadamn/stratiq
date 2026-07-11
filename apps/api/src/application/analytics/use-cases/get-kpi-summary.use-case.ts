@@ -30,7 +30,7 @@ export class GetKpiSummaryUseCase {
     );
 
     const cacheKey = buildAnalyticsCacheKey(context.datasetVersionId, CACHE_SCOPE, filters);
-    const cached = this.cache.get<KpiSummaryDto>(cacheKey);
+    const cached = await this.cache.get<KpiSummaryDto>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -47,7 +47,7 @@ export class GetKpiSummaryUseCase {
     );
 
     const summary: KpiSummaryDto = { ...pureSummary, topProducts, inventoryTurnover };
-    this.cache.set(cacheKey, summary);
+    await this.cache.set(cacheKey, summary);
     return summary;
   }
 }

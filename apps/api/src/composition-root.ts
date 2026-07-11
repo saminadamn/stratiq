@@ -111,15 +111,199 @@ import { GetDecisionIntelligenceUseCase } from './application/analytics/decision
 
 // v1.0 (Executive Reporting).
 import { PrismaReportRepository } from './infrastructure/persistence/prisma-report.repository.js';
-import { GenerateReportUseCase } from './application/analytics/reporting/use-cases/generate-report.use-case.js';
 import { ListReportsUseCase } from './application/analytics/reporting/use-cases/list-reports.use-case.js';
 import { DownloadReportUseCase } from './application/analytics/reporting/use-cases/download-report.use-case.js';
+import type { AnalyticsCache } from './application/ports/analytics-cache.port.js';
+import type { ReportGenerator } from './application/ports/report-generator.port.js';
+
+// v1.1 (Distributed Systems Showcase).
+import { Worker } from 'bullmq';
+import { createBullMqConnection, createRedisClient } from './infrastructure/redis/redis-client.js';
+import { RedisAnalyticsCache } from './infrastructure/cache/redis-analytics-cache.js';
+import RedisStore, { type RedisReply } from 'rate-limit-redis';
+import { ProcessReportJobService } from './application/analytics/reporting/process-report-job.service.js';
+import { EnqueueReportUseCase } from './application/analytics/reporting/use-cases/enqueue-report.use-case.js';
+import {
+  BullMqReportQueue,
+  REPORT_QUEUE_NAME,
+} from './infrastructure/queue/bullmq-report-queue.js';
+import { InProcessReportQueue } from './infrastructure/queue/in-process-report-queue.js';
+import type { ReportQueue } from './application/ports/report-queue.port.js';
+import type { FileStorage } from './application/ports/file-storage.port.js';
+import { setReportQueue } from './infrastructure/observability/metrics.js';
 
 export interface Server {
   app: Express;
   prisma: PrismaClient;
   env: Env;
   logger: Logger;
+  // Present only when an embedded worker was started (REDIS_URL set and
+  // WORKER_MODE !== 'standalone') — see createServer() and worker.ts.
+  worker?: Worker;
+}
+
+// Everything report generation needs (dataset resolution, the analytics/ML/
+// decision-intelligence use cases a report can pull from, and report
+// persistence) — shared between the HTTP server and the async report worker
+// (v1.1) so both build the exact same graph instead of two hand-maintained
+// copies drifting apart. Callers own the singletons that must stay
+// consistent with the rest of the process (analyticsCache, fileStorage,
+// reportGenerator) and pass them in.
+interface ReportingDependencies {
+  resolveAnalyticsDataset: ResolveAnalyticsDatasetService;
+  getExecutiveDashboard: GetExecutiveDashboardUseCase;
+  getKpiSummary: GetKpiSummaryUseCase;
+  getChurnPredictions: GetChurnPredictionsUseCase;
+  getSalesForecast: GetSalesForecastUseCase;
+  getCustomerSegments: GetCustomerSegmentsUseCase;
+  getProductRecommendations: GetProductRecommendationsUseCase;
+  getDecisionIntelligence: GetDecisionIntelligenceUseCase;
+  reportRepository: PrismaReportRepository;
+}
+
+function buildReportingDependencies(
+  prisma: PrismaClient,
+  env: Env,
+  analyticsCache: AnalyticsCache,
+): ReportingDependencies {
+  const datasetRepository = new PrismaDatasetRepository(prisma);
+  const datasetVersionRepository = new PrismaDatasetVersionRepository(prisma);
+  const datasetRowRepository = new PrismaDatasetRowRepository(prisma);
+
+  const resolveAnalyticsDataset = new ResolveAnalyticsDatasetService(
+    datasetRepository,
+    datasetVersionRepository,
+    datasetRowRepository,
+  );
+  const customerAnalyticsService = new CustomerAnalyticsService();
+  const productAnalyticsService = new ProductAnalyticsService();
+  const inventoryAnalyticsService = new InventoryAnalyticsService();
+  const kpiEngineService = new KpiEngineService();
+  const aggregationService = new AggregationService();
+  const timeSeriesService = new TimeSeriesService();
+
+  const getExecutiveDashboard = new GetExecutiveDashboardUseCase(
+    resolveAnalyticsDataset,
+    customerAnalyticsService,
+    productAnalyticsService,
+    inventoryAnalyticsService,
+    kpiEngineService,
+    timeSeriesService,
+    aggregationService,
+    analyticsCache,
+  );
+  const getKpiSummary = new GetKpiSummaryUseCase(
+    resolveAnalyticsDataset,
+    customerAnalyticsService,
+    productAnalyticsService,
+    inventoryAnalyticsService,
+    kpiEngineService,
+    analyticsCache,
+  );
+
+  const mlFeatureSnapshotRepository = new PrismaMlFeatureSnapshotRepository(prisma);
+  const mlModelRepository = new PrismaMlModelRepository(prisma);
+  const predictionRepository = new PrismaPredictionRepository(prisma);
+  const mlServiceClient = new HttpMlServiceClient(env.ML_SERVICE_URL);
+  const featureStoreService = new FeatureStoreService();
+
+  const getChurnPredictions = new GetChurnPredictionsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+  const getSalesForecast = new GetSalesForecastUseCase(
+    resolveAnalyticsDataset,
+    mlServiceClient,
+    mlModelRepository,
+    predictionRepository,
+  );
+  const getCustomerSegments = new GetCustomerSegmentsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+  const getProductRecommendations = new GetProductRecommendationsUseCase(
+    resolveAnalyticsDataset,
+    featureStoreService,
+    mlServiceClient,
+    mlModelRepository,
+    mlFeatureSnapshotRepository,
+    predictionRepository,
+  );
+
+  const insightRepository = new PrismaInsightRepository(prisma);
+  const alertRepository = new PrismaAlertRepository(prisma);
+  const decisionRecommendationRepository = new PrismaDecisionRecommendationRepository(prisma);
+  const benchmarkEngineService = new BenchmarkEngineService();
+  const rootCauseAnalysisService = new RootCauseAnalysisService();
+  const actionPlanBuilder = new ActionPlanBuilder();
+  const recommendationEngineService = new RecommendationEngineService(actionPlanBuilder);
+  const metricCalculators = buildMetricCalculators(inventoryAnalyticsService);
+  const generateDecisionIntelligenceService = new GenerateDecisionIntelligenceService(
+    insightRepository,
+    alertRepository,
+    predictionRepository,
+    decisionRecommendationRepository,
+    benchmarkEngineService,
+    rootCauseAnalysisService,
+    recommendationEngineService,
+    metricCalculators,
+  );
+  const getDecisionIntelligence = new GetDecisionIntelligenceUseCase(
+    resolveAnalyticsDataset,
+    generateDecisionIntelligenceService,
+    decisionRecommendationRepository,
+  );
+
+  const reportRepository = new PrismaReportRepository(prisma);
+
+  return {
+    resolveAnalyticsDataset,
+    getExecutiveDashboard,
+    getKpiSummary,
+    getChurnPredictions,
+    getSalesForecast,
+    getCustomerSegments,
+    getProductRecommendations,
+    getDecisionIntelligence,
+    reportRepository,
+  };
+}
+
+// The queue-consuming half of report generation (see
+// process-report-job.service.ts) — built the same way for the HTTP server's
+// embedded worker and the standalone worker entrypoint (worker.ts), so
+// there's exactly one place that assembles this constructor call.
+function buildProcessReportJobService(
+  reportingDeps: ReportingDependencies,
+  reportGenerator: ReportGenerator,
+  fileStorage: FileStorage,
+): ProcessReportJobService {
+  return new ProcessReportJobService(
+    reportingDeps.getExecutiveDashboard,
+    reportingDeps.getKpiSummary,
+    reportingDeps.getChurnPredictions,
+    reportingDeps.getSalesForecast,
+    reportingDeps.getCustomerSegments,
+    reportingDeps.getProductRecommendations,
+    reportingDeps.getDecisionIntelligence,
+    reportGenerator,
+    fileStorage,
+    reportingDeps.reportRepository,
+  );
+}
+
+function resolveStorageRoot(env: Env): string {
+  return path.isAbsolute(env.STORAGE_ROOT)
+    ? env.STORAGE_ROOT
+    : path.resolve(process.cwd(), env.STORAGE_ROOT);
 }
 
 // The composition root: the only place infrastructure implementations
@@ -152,10 +336,7 @@ export async function createServer(): Promise<Server> {
   const etlJobRepository = new PrismaEtlJobRepository(prisma);
   const featureSetRepository = new PrismaFeatureSetRepository(prisma);
 
-  const storageRoot = path.isAbsolute(env.STORAGE_ROOT)
-    ? env.STORAGE_ROOT
-    : path.resolve(process.cwd(), env.STORAGE_ROOT);
-  const fileStorage = new LocalFileStorage(storageRoot);
+  const fileStorage: FileStorage = new LocalFileStorage(resolveStorageRoot(env));
   const fileParserFactory = new DefaultFileParserFactory();
   const maxUploadSizeBytes = env.MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
@@ -167,31 +348,76 @@ export async function createServer(): Promise<Server> {
   );
 
   const savedDashboardViewRepository = new PrismaSavedDashboardViewRepository(prisma);
-  const analyticsCache = new InMemoryAnalyticsCache();
-  const reportGenerator = new PdfKitReportGenerator();
 
-  const resolveAnalyticsDataset = new ResolveAnalyticsDatasetService(
-    datasetRepository,
-    datasetVersionRepository,
-    datasetRowRepository,
+  // Every Redis-backed feature in this process branches on the same client:
+  // unset REDIS_URL keeps today's single-process behavior everywhere
+  // (in-memory cache, in-memory rate limiter, synchronous report
+  // generation); setting it switches all three to their distributed
+  // equivalents at once. See docs/adr/0006-redis-caching-and-rate-limiting.md.
+  const redisClient = env.REDIS_URL ? createRedisClient(env.REDIS_URL) : null;
+  const analyticsCache: AnalyticsCache = redisClient
+    ? new RedisAnalyticsCache(redisClient, env.REDIS_CACHE_TTL_SECONDS)
+    : new InMemoryAnalyticsCache();
+  const reportGenerator: ReportGenerator = new PdfKitReportGenerator();
+
+  // Distinct prefixes so the global and auth limiters don't share counters
+  // in the same Redis keyspace.
+  const globalRateLimitStore = redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(...(args as [string, ...string[]])) as Promise<RedisReply>,
+        prefix: 'rl:global:',
+      })
+    : undefined;
+  const authRateLimitStore = redisClient
+    ? new RedisStore({
+        sendCommand: (...args: string[]) =>
+          redisClient.call(...(args as [string, ...string[]])) as Promise<RedisReply>,
+        prefix: 'rl:auth:',
+      })
+    : undefined;
+
+  const reportingDeps = buildReportingDependencies(prisma, env, analyticsCache);
+  const { resolveAnalyticsDataset } = reportingDeps;
+
+  const processReportJobService = buildProcessReportJobService(
+    reportingDeps,
+    reportGenerator,
+    fileStorage,
   );
+  // Same REDIS_URL branch as the cache/rate-limit stores above: a real
+  // BullMQ queue when Redis is configured, otherwise a same-process
+  // fallback that keeps the enqueue-and-poll contract identical either way.
+  const bullMqReportQueue = redisClient
+    ? new BullMqReportQueue(createBullMqConnection(env.REDIS_URL as string))
+    : null;
+  if (bullMqReportQueue) {
+    setReportQueue(bullMqReportQueue.getQueue());
+  }
+  const reportQueue: ReportQueue =
+    bullMqReportQueue ?? new InProcessReportQueue(processReportJobService, logger);
+  const enqueueReport = new EnqueueReportUseCase(
+    resolveAnalyticsDataset,
+    reportingDeps.reportRepository,
+    reportQueue,
+  );
+  // WORKER_MODE=embedded (the default) runs the job consumer inside this
+  // same process — required for single-service free-tier hosting.
+  // WORKER_MODE=standalone leaves consumption to the dedicated `worker`
+  // service (see docker-compose) so the API doesn't double-consume the queue.
+  const worker =
+    redisClient && env.WORKER_MODE !== 'standalone'
+      ? new Worker(REPORT_QUEUE_NAME, (job) => processReportJobService.process(job.data), {
+          connection: createBullMqConnection(env.REDIS_URL as string),
+        })
+      : undefined;
+
   const customerAnalyticsService = new CustomerAnalyticsService();
   const productAnalyticsService = new ProductAnalyticsService();
   const inventoryAnalyticsService = new InventoryAnalyticsService();
-  const kpiEngineService = new KpiEngineService();
   const aggregationService = new AggregationService();
   const timeSeriesService = new TimeSeriesService();
 
-  const getExecutiveDashboard = new GetExecutiveDashboardUseCase(
-    resolveAnalyticsDataset,
-    customerAnalyticsService,
-    productAnalyticsService,
-    inventoryAnalyticsService,
-    kpiEngineService,
-    timeSeriesService,
-    aggregationService,
-    analyticsCache,
-  );
   const getCustomerAnalytics = new GetCustomerAnalyticsUseCase(
     resolveAnalyticsDataset,
     customerAnalyticsService,
@@ -238,84 +464,18 @@ export async function createServer(): Promise<Server> {
     metricCalculators,
   );
 
-  const mlFeatureSnapshotRepository = new PrismaMlFeatureSnapshotRepository(prisma);
-  const mlModelRepository = new PrismaMlModelRepository(prisma);
-  const predictionRepository = new PrismaPredictionRepository(prisma);
-  const mlServiceClient = new HttpMlServiceClient(env.ML_SERVICE_URL);
-  const featureStoreService = new FeatureStoreService();
-
-  const decisionRecommendationRepository = new PrismaDecisionRecommendationRepository(prisma);
-  const rootCauseAnalysisService = new RootCauseAnalysisService();
-  const actionPlanBuilder = new ActionPlanBuilder();
-  const recommendationEngineService = new RecommendationEngineService(actionPlanBuilder);
-  const generateDecisionIntelligenceService = new GenerateDecisionIntelligenceService(
-    insightRepository,
-    alertRepository,
-    predictionRepository,
-    decisionRecommendationRepository,
-    benchmarkEngineService,
-    rootCauseAnalysisService,
-    recommendationEngineService,
-    metricCalculators,
-  );
-
-  const getKpiSummary = new GetKpiSummaryUseCase(
-    resolveAnalyticsDataset,
-    customerAnalyticsService,
-    productAnalyticsService,
-    inventoryAnalyticsService,
-    kpiEngineService,
-    analyticsCache,
-  );
-
-  const getChurnPredictions = new GetChurnPredictionsUseCase(
-    resolveAnalyticsDataset,
-    featureStoreService,
-    mlServiceClient,
-    mlModelRepository,
-    mlFeatureSnapshotRepository,
-    predictionRepository,
-  );
-  const getSalesForecast = new GetSalesForecastUseCase(
-    resolveAnalyticsDataset,
-    mlServiceClient,
-    mlModelRepository,
-    predictionRepository,
-  );
-  const getCustomerSegments = new GetCustomerSegmentsUseCase(
-    resolveAnalyticsDataset,
-    featureStoreService,
-    mlServiceClient,
-    mlModelRepository,
-    mlFeatureSnapshotRepository,
-    predictionRepository,
-  );
-  const getProductRecommendations = new GetProductRecommendationsUseCase(
-    resolveAnalyticsDataset,
-    featureStoreService,
-    mlServiceClient,
-    mlModelRepository,
-    mlFeatureSnapshotRepository,
-    predictionRepository,
-  );
-  const getDecisionIntelligence = new GetDecisionIntelligenceUseCase(
-    resolveAnalyticsDataset,
-    generateDecisionIntelligenceService,
-    decisionRecommendationRepository,
-  );
-
-  const reportRepository = new PrismaReportRepository(prisma);
-
   const app = createApp({
     corsOrigin: env.CORS_ORIGIN,
     logger,
     rateLimit: {
       windowMs: env.RATE_LIMIT_WINDOW_MS,
       max: env.RATE_LIMIT_MAX,
+      ...(globalRateLimitStore ? { store: globalRateLimitStore } : {}),
     },
     readiness: {
       prisma,
       mlServiceUrl: env.ML_SERVICE_URL,
+      redisClient,
     },
     routesDeps: {
       auth: {
@@ -382,7 +542,7 @@ export async function createServer(): Promise<Server> {
       },
       datasetUpload: createUploadMiddleware(maxUploadSizeBytes),
       analytics: {
-        getKpiSummary,
+        getKpiSummary: reportingDeps.getKpiSummary,
         getRevenueAnalytics: new GetRevenueAnalyticsUseCase(
           resolveAnalyticsDataset,
           customerAnalyticsService,
@@ -393,9 +553,9 @@ export async function createServer(): Promise<Server> {
         getCustomerAnalytics,
         getProductAnalytics,
         getInventoryAnalytics,
-        getExecutiveDashboard,
+        getExecutiveDashboard: reportingDeps.getExecutiveDashboard,
         exportDashboard: new ExportDashboardUseCase(
-          getExecutiveDashboard,
+          reportingDeps.getExecutiveDashboard,
           getCustomerAnalytics,
           getProductAnalytics,
           getInventoryAnalytics,
@@ -440,35 +600,66 @@ export async function createServer(): Promise<Server> {
         deleteBusinessRule: new DeleteBusinessRuleUseCase(businessRuleRepository),
       },
       predictions: {
-        getChurnPredictions,
-        getSalesForecast,
-        getCustomerSegments,
-        getProductRecommendations,
+        getChurnPredictions: reportingDeps.getChurnPredictions,
+        getSalesForecast: reportingDeps.getSalesForecast,
+        getCustomerSegments: reportingDeps.getCustomerSegments,
+        getProductRecommendations: reportingDeps.getProductRecommendations,
       },
       decisions: {
-        getDecisionIntelligence,
+        getDecisionIntelligence: reportingDeps.getDecisionIntelligence,
       },
       reports: {
-        generateReport: new GenerateReportUseCase(
-          resolveAnalyticsDataset,
-          getExecutiveDashboard,
-          getKpiSummary,
-          getChurnPredictions,
-          getSalesForecast,
-          getCustomerSegments,
-          getProductRecommendations,
-          getDecisionIntelligence,
-          reportGenerator,
-          fileStorage,
-          reportRepository,
-        ),
-        listReports: new ListReportsUseCase(reportRepository),
-        downloadReport: new DownloadReportUseCase(reportRepository, fileStorage),
+        generateReport: enqueueReport,
+        listReports: new ListReportsUseCase(reportingDeps.reportRepository),
+        downloadReport: new DownloadReportUseCase(reportingDeps.reportRepository, fileStorage),
       },
       tokenService,
       membershipRepository,
+      ...(authRateLimitStore ? { authRateLimitStore } : {}),
     },
   });
 
-  return { app, prisma, env, logger };
+  return { app, prisma, env, logger, ...(worker ? { worker } : {}) };
+}
+
+export interface WorkerHandle {
+  worker: Worker;
+  prisma: PrismaClient;
+  env: Env;
+  logger: Logger;
+}
+
+// Standalone worker entrypoint (see worker.ts) — the Docker Compose
+// `worker` service and any horizontally-scaled worker replica run this,
+// consuming the same BullMQ queue createServer()'s embedded worker would.
+// Requires REDIS_URL: there is no in-process fallback for a process whose
+// only job is consuming a queue.
+export async function createWorker(): Promise<WorkerHandle> {
+  const env = loadEnv();
+  if (!env.REDIS_URL) {
+    throw new Error('createWorker() requires REDIS_URL to be set.');
+  }
+  const prisma = createPrismaClient();
+  const logger = new PinoLogger(env.LOG_LEVEL);
+
+  const redisClient = createRedisClient(env.REDIS_URL);
+  const analyticsCache: AnalyticsCache = new RedisAnalyticsCache(
+    redisClient,
+    env.REDIS_CACHE_TTL_SECONDS,
+  );
+  const reportGenerator: ReportGenerator = new PdfKitReportGenerator();
+  const fileStorage: FileStorage = new LocalFileStorage(resolveStorageRoot(env));
+
+  const reportingDeps = buildReportingDependencies(prisma, env, analyticsCache);
+  const processReportJobService = buildProcessReportJobService(
+    reportingDeps,
+    reportGenerator,
+    fileStorage,
+  );
+
+  const worker = new Worker(REPORT_QUEUE_NAME, (job) => processReportJobService.process(job.data), {
+    connection: createBullMqConnection(env.REDIS_URL),
+  });
+
+  return { worker, prisma, env, logger };
 }

@@ -28,11 +28,24 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # v1.1 (Distributed Systems Showcase). Real Redis so the
+      # Redis-backed cache/rate-limit/queue paths actually run in CI
+      # instead of only ever exercising the no-Redis fallback.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     env:
       DATABASE_URL: postgresql://stratiq:stratiq_test_password@localhost:5432/stratiq_test?schema=public
       JWT_ACCESS_SECRET: ci-placeholder-access-secret-please-change-32chars
       JWT_REFRESH_SECRET: ci-placeholder-refresh-secret-please-change-32chars
+      REDIS_URL: redis://localhost:6379
 
     steps:
       - name: Checkout

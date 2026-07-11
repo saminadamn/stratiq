@@ -2,14 +2,19 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import express, { type Express } from 'express';
+import type { Store } from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
+import type { Redis } from 'ioredis';
 import swaggerUi from 'swagger-ui-express';
 import { parse as parseYaml } from 'yaml';
 import { createApiRouter, type ApiRoutesDeps } from './routes/index.js';
 import { createErrorHandlerMiddleware } from './middleware/error-handler.middleware.js';
 import { createGlobalRateLimiter } from './middleware/rate-limit.middleware.js';
+import { createRequestIdMiddleware } from './middleware/request-id.middleware.js';
+import { metricsMiddleware } from './middleware/metrics.middleware.js';
 import { createReadinessHandler } from './readiness.js';
+import { registry } from '../../infrastructure/observability/metrics.js';
 import type { Logger } from '../../application/ports/logger.port.js';
 
 export interface CreateAppOptions {
@@ -19,6 +24,10 @@ export interface CreateAppOptions {
   rateLimit: {
     windowMs: number;
     max: number;
+    // Unset in single-instance/local-dev use (falls back to
+    // express-rate-limit's in-memory store); a Redis-backed store here
+    // makes the limit correct across horizontally-scaled instances.
+    store?: Store;
   };
   // Liveness (`/health`) only checks the process is up; readiness
   // (`/health/ready`) checks these actual dependencies are reachable — an
@@ -26,6 +35,7 @@ export interface CreateAppOptions {
   readiness: {
     prisma: PrismaClient;
     mlServiceUrl: string;
+    redisClient: Redis | null;
   };
 }
 
@@ -52,11 +62,20 @@ export function createApp(options: CreateAppOptions): Express {
   // work) means the CORS layer already has to allow them.
   app.use(cors({ origin: options.corsOrigin, credentials: true }));
   app.use(express.json());
+  app.use(createRequestIdMiddleware(options.logger));
+  app.use(metricsMiddleware);
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
   });
   app.get('/health/ready', createReadinessHandler(options.readiness));
+
+  // Unauthenticated (see docs/adr/0008-observability.md for the tradeoff) —
+  // Prometheus exposition format, no dashboard stack behind it.
+  app.get('/metrics', async (_req, res) => {
+    res.setHeader('Content-Type', registry.contentType);
+    res.end(await registry.metrics());
+  });
 
   const openApiDocument = loadOpenApiDocument();
   if (openApiDocument) {
@@ -65,7 +84,11 @@ export function createApp(options: CreateAppOptions): Express {
 
   app.use(
     '/api/v1',
-    createGlobalRateLimiter(options.rateLimit.windowMs, options.rateLimit.max),
+    createGlobalRateLimiter(
+      options.rateLimit.windowMs,
+      options.rateLimit.max,
+      options.rateLimit.store,
+    ),
     createApiRouter(options.routesDeps),
   );
 
