@@ -61,11 +61,11 @@ export function LandingPage(): JSX.Element {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 pb-24 pt-12 text-center sm:pt-20">
-        <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-700">
-          AI Business Intelligence Platform
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Enterprise Business Intelligence Platform
         </span>
 
-        <h1 className="mx-auto mt-8 max-w-2xl text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+        <h1 className="mx-auto mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
           Turn operational data into executive decisions.
         </h1>
 
@@ -74,25 +74,7 @@ export function LandingPage(): JSX.Element {
           and generate actionable recommendations — all in one platform.
         </p>
 
-        <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          {CAPABILITIES.map((capability) => (
-            <span
-              key={capability}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                className="h-4 w-4 text-teal-600"
-              >
-                <path d="M4 10.5l3.5 3.5L16 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {capability}
-            </span>
-          ))}
-        </div>
+        <p className="mx-auto mt-5 max-w-xl text-sm text-slate-400">{CAPABILITIES.join('  ·  ')}</p>
 
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link
