@@ -106,6 +106,10 @@ export function LandingPage(): JSX.Element {
           ))}
         </div>
       </main>
+
+      <footer className="mx-auto max-w-6xl px-6 pb-8 text-center text-xs text-slate-400">
+        © 2026 StratIQ
+      </footer>
     </div>
   );
 }
