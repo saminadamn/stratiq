@@ -2,13 +2,30 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 
 const PIPELINE_STEPS = [
-  { label: 'Upload operational data', detail: 'CSV in, cleaned and validated in minutes.' },
-  { label: 'Predict business performance', detail: 'Forecasts, churn risk, customer segments.' },
-  { label: 'Identify root causes', detail: 'Why a metric moved, not just that it did.' },
   {
-    label: 'Generate executive recommendations',
-    detail: 'Prioritized actions with owners and ROI.',
+    label: 'Data Preparation',
+    detail: 'Upload CSV files and automatically clean, validate, and structure your business data.',
   },
+  {
+    label: 'Predictive Intelligence',
+    detail: 'Forecast revenue, identify churn risk, and segment customers.',
+  },
+  {
+    label: 'Decision Intelligence',
+    detail: 'Understand the business drivers behind KPI changes with explainable analysis.',
+  },
+  {
+    label: 'Executive Action Plans',
+    detail:
+      'Receive prioritized recommendations, responsible teams, expected impact, and execution roadmap.',
+  },
+];
+
+const CAPABILITIES = [
+  'Predictive Analytics',
+  'Root Cause Analysis',
+  'Executive Reporting',
+  'Production Ready',
 ];
 
 // The public entry point at "/" — unauthenticated visitors land here instead
@@ -48,21 +65,34 @@ export function LandingPage(): JSX.Element {
           AI Business Intelligence Platform
         </span>
 
-        <div className="mx-auto mt-8 max-w-2xl space-y-1.5">
-          {PIPELINE_STEPS.map((step) => (
-            <p
-              key={step.label}
-              className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl"
-            >
-              {step.label}.
-            </p>
-          ))}
-        </div>
+        <h1 className="mx-auto mt-8 max-w-2xl text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+          Turn operational data into executive decisions.
+        </h1>
 
         <p className="mx-auto mt-6 max-w-xl text-base text-slate-500">
-          StratIQ turns raw operational data into the reasoning behind executive decisions —
-          deterministic, auditable, and ready to hand to a CEO.
+          Upload your business data to analyze performance, predict trends, identify root causes,
+          and generate actionable recommendations — all in one platform.
         </p>
+
+        <div className="mx-auto mt-6 flex max-w-xl flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {CAPABILITIES.map((capability) => (
+            <span
+              key={capability}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="h-4 w-4 text-teal-600"
+              >
+                <path d="M4 10.5l3.5 3.5L16 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {capability}
+            </span>
+          ))}
+        </div>
 
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link
