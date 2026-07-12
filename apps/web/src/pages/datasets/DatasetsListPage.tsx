@@ -58,8 +58,17 @@ export function DatasetsListPage(): JSX.Element {
       {datasets === null ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : datasets.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 p-12 text-center text-slate-400">
-          No datasets yet. Upload your first CSV or Excel file to get started.
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <p className="text-sm font-medium text-slate-700">
+            Upload your first dataset to generate KPIs, predictions, executive reports, and
+            business recommendations.
+          </p>
+          <Link
+            to="/datasets/upload"
+            className="mt-4 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500"
+          >
+            Upload dataset
+          </Link>
         </div>
       ) : (
         <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200/70 bg-white shadow-card">

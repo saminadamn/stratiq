@@ -12,7 +12,11 @@ function rootCause(overrides: Partial<RootCause> = {}): RootCause {
   return {
     metricKey: 'revenue',
     title: 'Why Revenue declined',
-    narrative: 'Revenue declined.',
+    diagnosticDetail: 'Revenue declined.',
+    finding: 'Revenue declined by 60.0%, driven primarily by Total Orders (-50.0%).',
+    businessImpact: 'This reduces cash flow and pressures the ability to fund operations.',
+    confidence: 'HIGH',
+    changePercent: -60,
     driverMetricKey: 'totalOrders',
     severity: 'CRITICAL',
     ...overrides,
@@ -57,6 +61,8 @@ describe('RecommendationEngineService', () => {
     expect(recommendation?.roiEstimate).toBe(300); // 600 * 0.5 recovery factor
     expect(recommendation?.priority).toBe('CRITICAL');
     expect(recommendation?.actionPlan).toHaveLength(3);
+    expect(recommendation?.team).toBe('MARKETING');
+    expect(recommendation?.confidence).toBe('HIGH');
   });
 
   it('gives the recommendation a distinct title from the root cause it came from', () => {
@@ -77,6 +83,12 @@ describe('RecommendationEngineService', () => {
       {},
     );
     expect(recommendation?.recommendationText).toContain('average order value');
+    expect(recommendation?.team).toBe('SALES');
+  });
+
+  it('routes a driver-less revenue recommendation to the General team', () => {
+    const [recommendation] = engine.fromRootCauses([rootCause({ driverMetricKey: null })], {});
+    expect(recommendation?.team).toBe('GENERAL');
   });
 
   it('does not estimate ROI when the benchmark shows growth, not decline', () => {
@@ -84,11 +96,15 @@ describe('RecommendationEngineService', () => {
     expect(recommendation?.roiEstimate).toBeNull();
   });
 
-  it('produces one recommendation per matching alert type', () => {
+  it('produces one recommendation per matching alert type, routed to Operations', () => {
     const recommendations = engine.fromAlerts([alert(), alert({ metricKey: 'inventoryTurnover' })]);
     expect(recommendations).toHaveLength(2);
     expect(recommendations[0]?.title).toContain('profit margin');
+    expect(recommendations[0]?.team).toBe('OPERATIONS');
+    expect(recommendations[0]?.confidence).toBe('HIGH');
     expect(recommendations[1]?.title).toContain('inventory turnover');
+    expect(recommendations[1]?.team).toBe('OPERATIONS');
+    expect(recommendations[1]?.confidence).toBe('MEDIUM');
   });
 
   it('produces no churn recommendation when nobody is above the risk threshold', () => {
@@ -123,5 +139,7 @@ describe('RecommendationEngineService', () => {
     ];
     const [recommendation] = engine.fromChurnPredictions(predictions, 100);
     expect(recommendation?.roiEstimate).toBe(60); // 2 customers * 100 * 0.3
+    expect(recommendation?.team).toBe('CUSTOMER_SUCCESS');
+    expect(recommendation?.confidence).toBe('MEDIUM'); // 2 at-risk customers -> MEDIUM priority
   });
 });

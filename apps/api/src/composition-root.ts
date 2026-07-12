@@ -380,6 +380,12 @@ export async function createServer(): Promise<Server> {
   const reportingDeps = buildReportingDependencies(prisma, env, analyticsCache);
   const { resolveAnalyticsDataset } = reportingDeps;
 
+  // Recover reports orphaned by a previous process exit mid-job (embedded
+  // WORKER_MODE has no durable queue — see InProcessReportQueue). Idempotent
+  // startup side-effect, same pattern as metricDefinitionRepository.upsertMany
+  // below.
+  await reportingDeps.reportRepository.markStaleAsFailed(10);
+
   const processReportJobService = buildProcessReportJobService(
     reportingDeps,
     reportGenerator,
@@ -651,6 +657,11 @@ export async function createWorker(): Promise<WorkerHandle> {
   const fileStorage: FileStorage = new LocalFileStorage(resolveStorageRoot(env));
 
   const reportingDeps = buildReportingDependencies(prisma, env, analyticsCache);
+
+  // Same reconciliation as createServer() — a worker crash mid-job can still
+  // orphan a report between its DB status write and BullMQ's own ack/retry.
+  await reportingDeps.reportRepository.markStaleAsFailed(10);
+
   const processReportJobService = buildProcessReportJobService(
     reportingDeps,
     reportGenerator,

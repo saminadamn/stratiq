@@ -15,5 +15,14 @@ export function toDecisionRecommendationDto(
     priority: recommendation.priority,
     actionPlan: recommendation.actionPlanJson as DecisionRecommendationDto['actionPlan'],
     createdAt: recommendation.createdAt.toISOString(),
+    finding: recommendation.finding,
+    businessImpact: recommendation.businessImpact,
+    confidence: recommendation.confidence,
+    severity: recommendation.severity,
+    changePercent: recommendation.changePercent,
+    metricKey: (recommendation.sourceRefsJson['metricKey'] as string | undefined) ?? null,
+    driverMetricKey:
+      (recommendation.sourceRefsJson['driverMetricKey'] as string | undefined) ?? null,
+    team: recommendation.team,
   };
 }

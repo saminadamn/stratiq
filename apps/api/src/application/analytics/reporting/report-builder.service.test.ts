@@ -119,6 +119,14 @@ describe('ReportBuilderService', () => {
         priority: 'CRITICAL',
         actionPlan: null,
         createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: null,
+        changePercent: null,
+        metricKey: 'revenue',
+        driverMetricKey: 'totalOrders',
+        team: null,
       },
       {
         id: '2',
@@ -131,27 +139,196 @@ describe('ReportBuilderService', () => {
         priority: 'HIGH',
         actionPlan: [{ day: 30, action: 'Reach out directly.' }],
         createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: null,
+        changePercent: null,
+        metricKey: null,
+        driverMetricKey: null,
+        team: 'CUSTOMER_SUCCESS',
       },
     ];
 
     const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', decisions);
 
-    const rootCauseSection = request.sections.find((s) => s.heading === 'Root Causes');
-    expect(rootCauseSection?.rows).toEqual([
-      { title: 'Why Revenue declined', explanation: 'Orders dropped.' },
+    const findingsSection = request.sections.find((s) => s.heading === 'Key Findings');
+    expect(findingsSection?.cards).toEqual([
+      {
+        title: 'Why Revenue declined',
+        badge: undefined,
+        body: 'Orders dropped.',
+        fields: undefined,
+      },
     ]);
+  });
+
+  it('prefers finding+businessImpact over the raw rootCause text when both are present', () => {
+    const decisions: DecisionRecommendationDto[] = [
+      {
+        id: '1',
+        category: 'ROOT_CAUSE',
+        title: 'Why Revenue declined',
+        rootCause: 'Revenue decreased 60% to $400. Revenue decline warning: threshold breached.',
+        recommendationText: null,
+        roiEstimate: null,
+        impactScore: 90,
+        priority: 'CRITICAL',
+        actionPlan: null,
+        createdAt: '2024-02-01T00:00:00.000Z',
+        finding: 'Revenue declined by 60.0%, driven primarily by Total Orders (-50.0%).',
+        businessImpact: 'This reduces cash flow and pressures the ability to fund operations.',
+        confidence: 'HIGH',
+        severity: 'CRITICAL',
+        changePercent: -60,
+        metricKey: 'revenue',
+        driverMetricKey: 'totalOrders',
+        team: null,
+      },
+    ];
+
+    const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', decisions);
+    const findingsSection = request.sections.find((s) => s.heading === 'Key Findings');
+    expect(findingsSection?.cards).toEqual([
+      {
+        title: 'Why Revenue declined',
+        badge: { label: 'Critical', color: '#dc2626' },
+        body: 'Revenue declined by 60.0%, driven primarily by Total Orders (-50.0%). This reduces cash flow and pressures the ability to fund operations.',
+        fields: [{ label: 'Confidence', value: 'High' }],
+      },
+    ]);
+  });
+
+  it('still builds the Recommendations and Action Plan sections alongside Root Causes', () => {
+    const decisions: DecisionRecommendationDto[] = [
+      {
+        id: '1',
+        category: 'ROOT_CAUSE',
+        title: 'Why Revenue declined',
+        rootCause: 'Orders dropped.',
+        recommendationText: null,
+        roiEstimate: null,
+        impactScore: 90,
+        priority: 'CRITICAL',
+        actionPlan: null,
+        createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: null,
+        changePercent: null,
+        metricKey: 'revenue',
+        driverMetricKey: 'totalOrders',
+        team: null,
+      },
+      {
+        id: '2',
+        category: 'RECOMMENDATION',
+        title: 'Retain at-risk customers',
+        rootCause: null,
+        recommendationText: 'Launch a retention campaign.',
+        roiEstimate: 300,
+        impactScore: 70,
+        priority: 'HIGH',
+        actionPlan: [{ day: 30, action: 'Reach out directly.' }],
+        createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: null,
+        changePercent: null,
+        metricKey: null,
+        driverMetricKey: null,
+        team: 'CUSTOMER_SUCCESS',
+      },
+    ];
+
+    const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', decisions);
 
     const recommendationSection = request.sections.find((s) => s.heading === 'Recommendations');
-    expect(recommendationSection?.rows).toHaveLength(1);
+    expect(recommendationSection?.cards).toEqual([
+      {
+        title: 'Retain at-risk customers',
+        badge: { label: 'HIGH', color: '#d97706' },
+        body: 'Launch a retention campaign.',
+        fields: [
+          { label: 'Owner', value: 'Customer Success' },
+          { label: 'Expected Impact', value: 'High' },
+          { label: 'Timeline', value: '30 Days' },
+          { label: 'Confidence', value: '—' },
+        ],
+      },
+    ]);
     expect(recommendationSection?.chart?.data).toEqual([
       { label: 'Retain at-risk customers', value: 70 },
     ]);
 
     const actionPlanSection = request.sections.find(
-      (s) => s.heading === '30/60/90-Day Action Plan',
+      (s) => s.heading === 'Appendix: 30/60/90-Day Action Plan',
     );
     expect(actionPlanSection?.rows).toEqual([
       { recommendation: 'Retain at-risk customers', day: 30, action: 'Reach out directly.' },
+    ]);
+  });
+
+  it('summarizes root causes and recommendations into deterministic executive-summary paragraphs', () => {
+    const decisions: DecisionRecommendationDto[] = [
+      {
+        id: '1',
+        category: 'ROOT_CAUSE',
+        title: 'Why Revenue declined',
+        rootCause: 'Orders dropped.',
+        recommendationText: null,
+        roiEstimate: null,
+        impactScore: 90,
+        priority: 'CRITICAL',
+        actionPlan: null,
+        createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: 'CRITICAL',
+        changePercent: null,
+        metricKey: 'revenue',
+        driverMetricKey: 'totalOrders',
+        team: null,
+      },
+      {
+        id: '2',
+        category: 'RECOMMENDATION',
+        title: 'Retain at-risk customers',
+        rootCause: null,
+        recommendationText: 'Launch a retention campaign.',
+        roiEstimate: 300,
+        impactScore: 70,
+        priority: 'HIGH',
+        actionPlan: null,
+        createdAt: '2024-02-01T00:00:00.000Z',
+        finding: null,
+        businessImpact: null,
+        confidence: null,
+        severity: null,
+        changePercent: null,
+        metricKey: null,
+        driverMetricKey: null,
+        team: 'CUSTOMER_SUCCESS',
+      },
+    ];
+
+    const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', decisions);
+    const summarySection = request.sections.find((s) => s.heading === 'Executive Summary');
+    expect(summarySection?.paragraphs).toEqual([
+      'This report identifies 1 root cause behind recent performance changes, including 1 rated critical and 0 rated warning.',
+      '1 action is recommended, led by "Retain at-risk customers."',
+    ]);
+  });
+
+  it('summarizes an all-clear dataset without a false critical/warning count', () => {
+    const request = builder.buildRecommendationReport('2024-02-01T00:00:00.000Z', []);
+    const summarySection = request.sections.find((s) => s.heading === 'Executive Summary');
+    expect(summarySection?.paragraphs).toEqual([
+      'No significant root causes were identified in this reporting period.',
+      'No actions are recommended at this time.',
     ]);
   });
 });

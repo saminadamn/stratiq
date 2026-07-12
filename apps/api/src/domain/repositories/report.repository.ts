@@ -22,4 +22,10 @@ export interface ReportRepository {
   updateStatus(id: string, input: UpdateReportStatusInput): Promise<Report>;
   listByOrganization(organizationId: string): Promise<Report[]>;
   findByOrganizationAndId(organizationId: string, id: string): Promise<Report | null>;
+  // Recovers reports orphaned by a process restart mid-job (the in-process
+  // embedded queue has no durable retry — see InProcessReportQueue). Marks
+  // anything still PENDING/PROCESSING older than the cutoff as FAILED so the
+  // UI shows a clear, actionable state instead of an indefinitely disabled
+  // Download button. Returns the number of rows updated.
+  markStaleAsFailed(olderThanMinutes: number): Promise<number>;
 }

@@ -24,9 +24,9 @@ export function ChartCard({
   actions,
 }: ChartCardProps): JSX.Element {
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-white shadow-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <div className="rounded-xl border border-slate-100 bg-white shadow-card p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
         {actions}
       </div>
       <div ref={chartRef} className="h-64 bg-white">

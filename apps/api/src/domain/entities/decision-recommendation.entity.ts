@@ -1,4 +1,10 @@
-import type { DecisionCategory, RecommendationPriority } from '@stratiq/shared';
+import type {
+  Confidence,
+  DecisionCategory,
+  InsightSeverity,
+  RecommendationPriority,
+  RecommendationTeam,
+} from '@stratiq/shared';
 
 export interface DecisionRecommendation {
   id: string;
@@ -14,4 +20,10 @@ export interface DecisionRecommendation {
   actionPlanJson: Array<{ day: number; action: string }> | null;
   sourceRefsJson: Record<string, unknown>;
   createdAt: Date;
+  finding: string | null;
+  businessImpact: string | null;
+  confidence: Confidence | null;
+  severity: InsightSeverity | null;
+  changePercent: number | null;
+  team: RecommendationTeam | null;
 }

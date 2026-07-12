@@ -50,7 +50,7 @@ describe('RootCauseAnalysisService', () => {
     };
     const [cause] = service.analyze([insight()], benchmarks);
     expect(cause?.driverMetricKey).toBe('totalOrders');
-    expect(cause?.narrative).toContain('totalOrders');
+    expect(cause?.diagnosticDetail).toContain('totalOrders');
   });
 
   it('picks the other driver when it is the larger negative mover', () => {
@@ -65,7 +65,42 @@ describe('RootCauseAnalysisService', () => {
   it('falls back to a null driver when no driver data is available', () => {
     const [cause] = service.analyze([insight()], {});
     expect(cause?.driverMetricKey).toBeNull();
-    expect(cause?.narrative).toBe(insight().narrative);
+    expect(cause?.diagnosticDetail).toBe(insight().narrative);
+  });
+
+  it('composes a driver-aware finding without threshold/rule jargon', () => {
+    const benchmarks = {
+      totalOrders: benchmark('totalOrders', -50),
+      averageOrderValue: benchmark('averageOrderValue', -5),
+    };
+    const [cause] = service.analyze([insight()], benchmarks);
+    expect(cause?.finding).toBe(
+      'Revenue declined by 60.0%, driven primarily by Total Orders (-50.0%).',
+    );
+    expect(cause?.finding).not.toContain('threshold');
+    expect(cause?.finding).not.toContain('Revenue decline warning');
+  });
+
+  it('falls back to a driver-less finding when no driver is attributed', () => {
+    const [cause] = service.analyze([insight()], {});
+    expect(cause?.finding).toBe('Revenue declined by 60.0%.');
+  });
+
+  it('assigns HIGH confidence when a driver is found and severity is CRITICAL', () => {
+    const benchmarks = { totalOrders: benchmark('totalOrders', -50) };
+    const [cause] = service.analyze([insight({ severity: 'CRITICAL' })], benchmarks);
+    expect(cause?.confidence).toBe('HIGH');
+  });
+
+  it('assigns LOW confidence when there is no driver and severity is INFO', () => {
+    const [cause] = service.analyze([insight({ severity: 'INFO' })], {});
+    expect(cause?.confidence).toBe('LOW');
+  });
+
+  it('carries the metric label and businessImpact through to the recommendation payload', () => {
+    const [cause] = service.analyze([insight()], {});
+    expect(cause?.businessImpact).toContain('cash flow');
+    expect(cause?.changePercent).toBe(-60);
   });
 
   it('does not attribute a driver for a metric with no known drivers', () => {

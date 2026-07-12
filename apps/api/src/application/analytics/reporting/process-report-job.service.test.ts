@@ -11,6 +11,7 @@ function buildDeps() {
     updateStatus: vi.fn().mockResolvedValue({}),
     listByOrganization: vi.fn(),
     findByOrganizationAndId: vi.fn(),
+    markStaleAsFailed: vi.fn().mockResolvedValue(0),
   };
   const reportGenerator: ReportGenerator = {
     generatePdf: vi.fn().mockResolvedValue(Buffer.from('pdf')),

@@ -46,13 +46,26 @@ export class GenerateDecisionIntelligenceService {
     context: AnalyticsDatasetContext,
     forceRefresh: boolean,
   ): Promise<void> {
-    if (!forceRefresh) {
-      const existing = await this.decisionRecommendations.findByDatasetVersion(
-        context.datasetVersionId,
-      );
-      if (existing.length > 0) {
-        return;
-      }
+    const existing = await this.decisionRecommendations.findByDatasetVersion(
+      context.datasetVersionId,
+    );
+    // Rows generated before the finding/businessImpact/confidence/team
+    // narrative fields existed have `finding: null` on every ROOT_CAUSE row
+    // and `confidence: null` on every RECOMMENDATION row (the mapper always
+    // sets both for new rows). Treat those as stale and regenerate instead of
+    // serving the old raw rule-engine text forever — ensureGenerated is
+    // otherwise idempotent per dataset version, so this only fires once per
+    // legacy dataset.
+    const isLegacy = existing.some(
+      (row) =>
+        (row.category === 'ROOT_CAUSE' && row.finding === null) ||
+        (row.category === 'RECOMMENDATION' && row.confidence === null),
+    );
+    if (!forceRefresh && existing.length > 0 && !isLegacy) {
+      return;
+    }
+    if (existing.length > 0) {
+      await this.decisionRecommendations.deleteByDatasetVersion(context.datasetVersionId);
     }
 
     const [insightRows, alertRows, churnPredictionRows] = await Promise.all([
@@ -85,13 +98,19 @@ export class GenerateDecisionIntelligenceService {
       datasetVersionId: context.datasetVersionId,
       category: 'ROOT_CAUSE' as DecisionCategory,
       title: cause.title,
-      rootCause: cause.narrative,
+      rootCause: cause.diagnosticDetail,
       recommendationText: null,
       roiEstimate: null,
       impactScore: severityToImpact(cause.severity),
       priority: severityToPriority(cause.severity),
       actionPlanJson: null,
       sourceRefsJson: { metricKey: cause.metricKey, driverMetricKey: cause.driverMetricKey },
+      finding: cause.finding,
+      businessImpact: cause.businessImpact,
+      confidence: cause.confidence,
+      severity: cause.severity,
+      changePercent: cause.changePercent,
+      team: null,
     }));
 
     const recommendationInputs = recommendations.map((recommendation) => ({
@@ -106,6 +125,12 @@ export class GenerateDecisionIntelligenceService {
       priority: recommendation.priority,
       actionPlanJson: recommendation.actionPlan,
       sourceRefsJson: {},
+      finding: null,
+      businessImpact: null,
+      confidence: recommendation.confidence,
+      severity: null,
+      changePercent: null,
+      team: recommendation.team,
     }));
 
     await this.decisionRecommendations.createMany([...rootCauseInputs, ...recommendationInputs]);

@@ -624,6 +624,22 @@ enum RecommendationPriority {
   CRITICAL
 }
 
+enum Confidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// Which team a RECOMMENDATION row's action is routed to, for the Manager
+// persona view. Null for ROOT_CAUSE rows.
+enum RecommendationTeam {
+  SALES
+  MARKETING
+  OPERATIONS
+  CUSTOMER_SUCCESS
+  GENERAL
+}
+
 // Deterministic output of the Decision Intelligence Engine — every row here
 // traces back to concrete Insight/Alert/Benchmark/Prediction inputs recorded
 // in sourceRefsJson, never to freeform generation (no LLM is used anywhere
@@ -642,6 +658,17 @@ model DecisionRecommendation {
   actionPlanJson     Json?
   sourceRefsJson     Json
   createdAt          DateTime               @default(now())
+  // Executive-readable headline + consequence sentence, plus a confidence
+  // rating (ROOT_CAUSE rows only; null on legacy rows and on RECOMMENDATION
+  // rows). severity/changePercent mirror the source Insight for the Analyst
+  // diagnostic table.
+  finding            String?
+  businessImpact     String?
+  confidence         Confidence?
+  severity           InsightSeverity?
+  changePercent      Float?
+  // RECOMMENDATION rows only — which team the action is routed to.
+  team               RecommendationTeam?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 

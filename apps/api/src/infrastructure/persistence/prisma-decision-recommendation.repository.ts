@@ -3,8 +3,17 @@ import {
   type PrismaClient,
   type DecisionCategory as PrismaDecisionCategory,
   type RecommendationPriority as PrismaPriority,
+  type Confidence as PrismaConfidence,
+  type InsightSeverity as PrismaInsightSeverity,
+  type RecommendationTeam as PrismaTeam,
 } from '@prisma/client';
-import type { DecisionCategory, RecommendationPriority } from '@stratiq/shared';
+import type {
+  Confidence,
+  DecisionCategory,
+  InsightSeverity,
+  RecommendationPriority,
+  RecommendationTeam,
+} from '@stratiq/shared';
 import type { DecisionRecommendation } from '../../domain/entities/decision-recommendation.entity.js';
 import type {
   CreateDecisionRecommendationInput,
@@ -28,6 +37,12 @@ function toDomain(row: Row): DecisionRecommendation {
     actionPlanJson: row.actionPlanJson as Array<{ day: number; action: string }> | null,
     sourceRefsJson: row.sourceRefsJson as Record<string, unknown>,
     createdAt: row.createdAt,
+    finding: row.finding,
+    businessImpact: row.businessImpact,
+    confidence: row.confidence as Confidence | null,
+    severity: row.severity as InsightSeverity | null,
+    changePercent: row.changePercent,
+    team: row.team as RecommendationTeam | null,
   };
 }
 
@@ -51,6 +66,12 @@ export class PrismaDecisionRecommendationRepository implements DecisionRecommend
         priority: input.priority as PrismaPriority,
         actionPlanJson: (input.actionPlanJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         sourceRefsJson: input.sourceRefsJson as Prisma.InputJsonValue,
+        finding: input.finding,
+        businessImpact: input.businessImpact,
+        confidence: input.confidence as PrismaConfidence | null,
+        severity: input.severity as PrismaInsightSeverity | null,
+        changePercent: input.changePercent,
+        team: input.team as PrismaTeam | null,
       })),
       skipDuplicates: true,
     });
@@ -62,5 +83,9 @@ export class PrismaDecisionRecommendationRepository implements DecisionRecommend
       orderBy: [{ impactScore: 'desc' }, { createdAt: 'asc' }],
     });
     return rows.map(toDomain);
+  }
+
+  async deleteByDatasetVersion(datasetVersionId: string): Promise<void> {
+    await this.prisma.decisionRecommendation.deleteMany({ where: { datasetVersionId } });
   }
 }

@@ -9,6 +9,50 @@ import type {
 } from '@stratiq/shared';
 import type { PdfReportRequest } from '../../ports/report-generator.port.js';
 
+const CRITICAL_COLOR = '#dc2626'; // red-600
+const WARNING_COLOR = '#d97706'; // amber-600
+const NEUTRAL_COLOR = '#64748b'; // slate-500
+
+const PRIORITY_COLOR: Record<string, string> = {
+  CRITICAL: CRITICAL_COLOR,
+  HIGH: WARNING_COLOR,
+  MEDIUM: '#2563eb', // blue-600
+  LOW: NEUTRAL_COLOR,
+};
+
+const TEAM_LABEL: Record<string, string> = {
+  SALES: 'Sales',
+  MARKETING: 'Marketing',
+  OPERATIONS: 'Operations',
+  CUSTOMER_SUCCESS: 'Customer Success',
+  GENERAL: 'General',
+};
+
+const CONFIDENCE_LABEL: Record<string, string> = { HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
+
+// Mirrors DecisionIntelligencePanel.tsx's expectedImpactLabel() — priority
+// already *is* the engine's impact ranking, kept as one deterministic
+// derivation rather than a second field.
+function expectedImpactLabel(priority: string): string {
+  if (priority === 'CRITICAL' || priority === 'HIGH') return 'High';
+  return priority === 'MEDIUM' ? 'Medium' : 'Low';
+}
+
+// Mirrors DecisionIntelligencePanel.tsx's timelineLabel().
+function timelineLabel(actionPlan: Array<{ day: number; action: string }> | null): string {
+  if (!actionPlan || actionPlan.length === 0) return '—';
+  const nearestDay = Math.min(...actionPlan.map((item) => item.day));
+  return `${nearestDay} Days`;
+}
+
+function severityBadge(
+  severity: 'INFO' | 'WARNING' | 'CRITICAL' | null,
+): { label: string; color: string } | undefined {
+  if (severity === 'CRITICAL') return { label: 'Critical', color: CRITICAL_COLOR };
+  if (severity === 'WARNING') return { label: 'Warning', color: WARNING_COLOR };
+  return undefined;
+}
+
 // Every method here composes DTOs already produced by earlier
 // sprints/modules (the dashboard use cases, Predictive Intelligence,
 // Decision Intelligence) into a PdfReportRequest — no new data-fetching or
@@ -178,27 +222,51 @@ export class ReportBuilderService {
     decisions: DecisionRecommendationDto[],
   ): PdfReportRequest {
     const rootCauses = decisions.filter((item) => item.category === 'ROOT_CAUSE');
-    const recommendations = decisions.filter((item) => item.category === 'RECOMMENDATION');
+    const recommendations = decisions
+      .filter((item) => item.category === 'RECOMMENDATION')
+      .sort((a, b) => b.impactScore - a.impactScore);
 
     return {
       title: 'Recommendation Report',
       generatedAt,
       sections: [
         {
-          heading: 'Root Causes',
-          rows: rootCauses.map((item) => ({
+          heading: 'Executive Summary',
+          paragraphs: buildExecutiveSummaryParagraphs(rootCauses, recommendations),
+          rows: [],
+        },
+        {
+          heading: 'Key Findings',
+          cards: rootCauses.map((item) => ({
             title: item.title,
-            explanation: item.rootCause ?? '',
+            badge: severityBadge(item.severity),
+            body:
+              item.finding && item.businessImpact
+                ? `${item.finding} ${item.businessImpact}`
+                : (item.rootCause ?? undefined),
+            fields: item.confidence
+              ? [{ label: 'Confidence', value: CONFIDENCE_LABEL[item.confidence] ?? item.confidence }]
+              : undefined,
           })),
+          rows: [],
         },
         {
           heading: 'Recommendations',
-          rows: recommendations.map((item) => ({
+          cards: recommendations.map((item) => ({
             title: item.title,
-            priority: item.priority,
-            roiEstimate: item.roiEstimate ?? 'N/A',
-            impactScore: item.impactScore,
+            badge: { label: item.priority, color: PRIORITY_COLOR[item.priority] ?? NEUTRAL_COLOR },
+            body: item.recommendationText ?? undefined,
+            fields: [
+              { label: 'Owner', value: item.team ? (TEAM_LABEL[item.team] ?? item.team) : '—' },
+              { label: 'Expected Impact', value: expectedImpactLabel(item.priority) },
+              { label: 'Timeline', value: timelineLabel(item.actionPlan) },
+              {
+                label: 'Confidence',
+                value: item.confidence ? (CONFIDENCE_LABEL[item.confidence] ?? item.confidence) : '—',
+              },
+            ],
           })),
+          rows: [],
           chart:
             recommendations.length > 0
               ? {
@@ -211,7 +279,7 @@ export class ReportBuilderService {
               : undefined,
         },
         {
-          heading: '30/60/90-Day Action Plan',
+          heading: 'Appendix: 30/60/90-Day Action Plan',
           rows: recommendations.flatMap(
             (item) =>
               item.actionPlan?.map((action) => ({
@@ -224,4 +292,32 @@ export class ReportBuilderService {
       ],
     };
   }
+}
+
+// Deterministic, count-based — the same "no freeform generation" constraint
+// as the rest of the Decision Intelligence Engine (see
+// recommendation-engine.service.ts), not a written-up summary.
+function buildExecutiveSummaryParagraphs(
+  rootCauses: DecisionRecommendationDto[],
+  recommendations: DecisionRecommendationDto[],
+): string[] {
+  const criticalCount = rootCauses.filter((item) => item.severity === 'CRITICAL').length;
+  const warningCount = rootCauses.filter((item) => item.severity === 'WARNING').length;
+
+  const findingsParagraph =
+    rootCauses.length === 0
+      ? 'No significant root causes were identified in this reporting period.'
+      : `This report identifies ${rootCauses.length} root cause${rootCauses.length === 1 ? '' : 's'} behind recent performance changes` +
+        (criticalCount > 0 || warningCount > 0
+          ? `, including ${criticalCount} rated critical and ${warningCount} rated warning.`
+          : '.');
+
+  const topRecommendation = recommendations[0];
+  const recommendationsParagraph =
+    recommendations.length === 0
+      ? 'No actions are recommended at this time.'
+      : `${recommendations.length} action${recommendations.length === 1 ? ' is' : 's are'} recommended` +
+        (topRecommendation ? `, led by "${topRecommendation.title}."` : '.');
+
+  return [findingsParagraph, recommendationsParagraph];
 }

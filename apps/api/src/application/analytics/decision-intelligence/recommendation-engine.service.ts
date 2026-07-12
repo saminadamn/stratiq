@@ -1,4 +1,9 @@
-import type { ChurnPredictionDto, RecommendationPriority } from '@stratiq/shared';
+import type {
+  ChurnPredictionDto,
+  Confidence,
+  RecommendationPriority,
+  RecommendationTeam,
+} from '@stratiq/shared';
 import type { Alert } from '../../../domain/entities/alert.entity.js';
 import type { BenchmarkResult } from '../intelligence/benchmark-engine.service.js';
 import type {
@@ -15,6 +20,19 @@ export interface GeneratedRecommendation {
   impactScore: number;
   priority: RecommendationPriority;
   actionPlan: ActionPlanItem[];
+  // Which team this action is routed to, for the Manager persona view.
+  team: RecommendationTeam;
+  // How confident the engine is in this recommendation, derived from
+  // priority (itself derived from a triggered alert/rule's severity) — not a
+  // separate fitted estimate. CRITICAL/HIGH priority -> HIGH confidence.
+  confidence: Confidence;
+}
+
+function confidenceForPriority(priority: RecommendationPriority): Confidence {
+  if (priority === 'CRITICAL' || priority === 'HIGH') {
+    return 'HIGH';
+  }
+  return priority === 'MEDIUM' ? 'MEDIUM' : 'LOW';
 }
 
 // Assumption: acting on a revenue-decline recommendation recovers half of
@@ -48,14 +66,17 @@ export class RecommendationEngineService {
 
     const marginAlert = alerts.find((alert) => alert.metricKey === 'profitMargin');
     if (marginAlert) {
+      const priority = marginAlert.severity === 'CRITICAL' ? 'CRITICAL' : 'HIGH';
       recommendations.push({
         title: 'Address negative profit margin',
         recommendationText:
           'Profit margin has fallen below zero. Review cost of goods sold and pricing on the lowest-margin products before the next reporting period.',
         roiEstimate: null,
         impactScore: marginAlert.severity === 'CRITICAL' ? 90 : 60,
-        priority: marginAlert.severity === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+        priority,
         actionPlan: this.actionPlanBuilder.build('NEGATIVE_PROFIT_MARGIN'),
+        team: 'OPERATIONS',
+        confidence: confidenceForPriority(priority),
       });
     }
 
@@ -69,6 +90,8 @@ export class RecommendationEngineService {
         impactScore: 50,
         priority: 'MEDIUM',
         actionPlan: this.actionPlanBuilder.build('SLOW_INVENTORY_TURNOVER'),
+        team: 'OPERATIONS',
+        confidence: confidenceForPriority('MEDIUM'),
       });
     }
 
@@ -90,14 +113,17 @@ export class RecommendationEngineService {
           100
         : null;
 
+    const priority = atRisk.length >= 5 ? 'HIGH' : 'MEDIUM';
     return [
       {
         title: `Retain ${atRisk.length} at-risk customer${atRisk.length === 1 ? '' : 's'}`,
         recommendationText: `${atRisk.length} customer${atRisk.length === 1 ? '' : 's'} ${atRisk.length === 1 ? 'has' : 'have'} a predicted churn probability of ${Math.round(CHURN_RISK_THRESHOLD * 100)}% or higher. Launch a targeted retention campaign before the next billing/order cycle.`,
         roiEstimate,
         impactScore: Math.min(100, atRisk.length * 10),
-        priority: atRisk.length >= 5 ? 'HIGH' : 'MEDIUM',
+        priority,
         actionPlan: this.actionPlanBuilder.build('HIGH_CHURN_RISK'),
+        team: 'CUSTOMER_SUCCESS',
+        confidence: confidenceForPriority(priority),
       },
     ];
   }
@@ -122,7 +148,22 @@ export class RecommendationEngineService {
       impactScore: cause.severity === 'CRITICAL' ? 85 : cause.severity === 'WARNING' ? 55 : 30,
       priority,
       actionPlan: this.actionPlanBuilder.build(category),
+      team: this.teamForCategory(category),
+      confidence: confidenceForPriority(priority),
     };
+  }
+
+  private teamForCategory(category: ActionPlanCategory): RecommendationTeam {
+    switch (category) {
+      case 'REVENUE_DECLINE_AOV':
+        // Bundling/upsell/pricing actions to raise order value sit with Sales.
+        return 'SALES';
+      case 'REVENUE_DECLINE_ORDERS':
+        // Rebuilding order volume is demand generation — Marketing's remit.
+        return 'MARKETING';
+      default:
+        return 'GENERAL';
+    }
   }
 
   private estimateRevenueRoi(benchmark: BenchmarkResult | undefined): number | null {

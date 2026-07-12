@@ -11,13 +11,15 @@ interface KpiCardProps {
 
 export function KpiCard({ label, value, hint, trend }: KpiCardProps): JSX.Element {
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-white p-4 shadow-card transition-shadow hover:shadow-md">
+    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-shadow hover:shadow-md">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="tabular-nums mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
-        {value}
-      </p>
+      {/* Proportional figures, not tabular-nums — a large standalone number
+          reads loose with every digit forced to the width of a "0" (dataviz
+          skill anti-patterns). Tabular is reserved for columns of aligned
+          numbers, not a hero value like this. */}
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
       {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-      {trend && <div className="mt-2">{trend}</div>}
+      {trend && <div className="mt-2.5">{trend}</div>}
     </div>
   );
 }

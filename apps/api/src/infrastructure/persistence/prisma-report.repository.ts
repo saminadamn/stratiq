@@ -83,4 +83,20 @@ export class PrismaReportRepository implements ReportRepository {
     });
     return row ? toDomain(row) : null;
   }
+
+  async markStaleAsFailed(olderThanMinutes: number): Promise<number> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60 * 1000);
+    const result = await this.prisma.report.updateMany({
+      where: {
+        status: { in: ['PENDING', 'PROCESSING'] },
+        generatedAt: { lt: cutoff },
+      },
+      data: {
+        status: 'FAILED',
+        errorMessage: 'Report generation was interrupted and did not complete — please regenerate.',
+        completedAt: new Date(),
+      },
+    });
+    return result.count;
+  }
 }

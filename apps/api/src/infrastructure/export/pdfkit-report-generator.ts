@@ -4,6 +4,7 @@ import type {
   PdfReportRequest,
   ReportGenerator,
 } from '../../application/ports/report-generator.port.js';
+import { drawCards, drawParagraphs, emptyStateText } from './pdf-card-helpers.js';
 import { drawChart } from './pdf-chart-helpers.js';
 import { drawTable } from './pdf-table-helpers.js';
 
@@ -44,26 +45,31 @@ export class PdfKitReportGenerator implements ReportGenerator {
 
       for (const section of request.sections) {
         drawSectionHeading(doc, section.heading);
+        const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+        if (section.paragraphs && section.paragraphs.length > 0) {
+          doc.y = drawParagraphs(doc, section.paragraphs, doc.page.margins.left, doc.y, contentWidth);
+        }
 
         if (section.chart) {
-          const chartWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
           // drawChart returns the y position immediately below the chart it
           // drew — used here (unlike before) so the table that follows
           // starts below the chart instead of overlapping it.
-          doc.y = drawChart(doc, section.chart, doc.x, doc.y, chartWidth);
+          doc.y = drawChart(doc, section.chart, doc.x, doc.y, contentWidth);
           doc.moveDown(0.5);
         }
 
-        if (section.rows.length === 0) {
-          doc
-            .fontSize(10)
-            .fillColor(MUTED_COLOR)
-            .font('Helvetica-Oblique')
-            .text('No data available.');
-          doc.fillColor(BODY_COLOR).font('Helvetica');
+        if (section.cards) {
+          doc.y =
+            section.cards.length === 0
+              ? emptyStateText(doc, 'No data available.', doc.page.margins.left, doc.y)
+              : drawCards(doc, section.cards, doc.page.margins.left, doc.y, contentWidth);
+        } else if (section.rows.length === 0) {
+          if (!section.paragraphs || section.paragraphs.length === 0) {
+            doc.y = emptyStateText(doc, 'No data available.', doc.page.margins.left, doc.y);
+          }
         } else {
-          const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-          doc.y = drawTable(doc, section.rows, doc.page.margins.left, doc.y, tableWidth);
+          doc.y = drawTable(doc, section.rows, doc.page.margins.left, doc.y, contentWidth);
         }
         doc.moveDown();
       }
@@ -128,6 +134,15 @@ function drawCoverPage(doc: PDFDocument, request: PdfReportRequest): void {
 }
 
 function drawSectionHeading(doc: PDFDocument, heading: string): void {
+  // Defensive: if the previous section's content-height estimate ever
+  // drifts from what actually got drawn (see pdf-card-helpers.ts), doc.y can
+  // land past the bottom margin here. Catching it explicitly avoids
+  // PDFKit's own implicit auto-pagination — which inserts a page without
+  // updating callers' cursor tracking — silently desyncing the page count
+  // addFooters() later stamps against.
+  if (doc.y > doc.page.height - doc.page.margins.bottom - 30) {
+    doc.addPage();
+  }
   const startY = doc.y;
   doc.rect(doc.page.margins.left, startY, 4, 16).fill(BRAND_LIGHT);
   doc
@@ -148,7 +163,18 @@ function addFooters(doc: PDFDocument): void {
 
   for (let i = range.start + 1; i < range.start + range.count; i += 1) {
     doc.switchToPage(i);
-    const footerY = doc.page.height - doc.page.margins.bottom + 18;
+    const originalBottomMargin = doc.page.margins.bottom;
+    const footerY = doc.page.height - originalBottomMargin + 18;
+    // footerY sits inside the bottom margin (by design — it's below the
+    // normal content area), but PDFKit's own auto-pagination triggers on
+    // *any* .text() call past `page.height - margins.bottom`, even ones
+    // with `lineBreak: false` and an explicit y. Without this, drawing the
+    // footer on every content page silently appended one extra blank page
+    // per page (bufferedPageRange().count climbs on every call below) —
+    // confirmed by isolated repro against pdfkit directly. Zeroing the
+    // margin for the duration of the footer draw keeps it inside PDFKit's
+    // idea of the page and prevents that.
+    doc.page.margins.bottom = 0;
     doc
       .strokeColor('#e2e8f0')
       .lineWidth(0.5)
@@ -165,5 +191,6 @@ function addFooters(doc: PDFDocument): void {
       align: 'right',
       lineBreak: false,
     });
+    doc.page.margins.bottom = originalBottomMargin;
   }
 }
