@@ -106,9 +106,7 @@ export function InsightsPanel({ organizationId }: InsightsPanelProps): JSX.Eleme
                     ` — ${formatPercent(Math.abs(insight.changePercent))} ${insight.trend === 'INCREASING' ? 'increase' : 'change'}`}
                 </p>
                 {driver && (
-                  <p className="mt-1 text-xs opacity-80">
-                    Primary driver: {metricLabel(driver)}
-                  </p>
+                  <p className="mt-1 text-xs opacity-80">Primary driver: {metricLabel(driver)}</p>
                 )}
                 {impact && <p className="mt-0.5 text-xs opacity-80">Business impact: {impact}</p>}
               </li>

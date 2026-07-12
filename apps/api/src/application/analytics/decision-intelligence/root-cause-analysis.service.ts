@@ -43,9 +43,12 @@ const DRIVER_LABELS: Record<string, string> = {
 // as METRIC_DRIVERS. Generic fallback covers any metric without a bespoke
 // sentence (e.g. one added later without updating this map).
 const BUSINESS_IMPACT_BY_METRIC: Record<string, string> = {
-  revenue: 'This reduces cash flow and pressures the organization\'s ability to fund operations and growth.',
-  grossProfit: 'Margins are compressing faster than the top line, directly reducing what the business retains after costs.',
-  customerLifetimeValue: 'Each customer is now worth less to the business over time, weakening long-term profitability.',
+  revenue:
+    "This reduces cash flow and pressures the organization's ability to fund operations and growth.",
+  grossProfit:
+    'Margins are compressing faster than the top line, directly reducing what the business retains after costs.',
+  customerLifetimeValue:
+    'Each customer is now worth less to the business over time, weakening long-term profitability.',
 };
 const DEFAULT_BUSINESS_IMPACT =
   'This may materially affect overall business performance if the trend continues.';

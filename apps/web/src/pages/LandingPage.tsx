@@ -5,7 +5,10 @@ const PIPELINE_STEPS = [
   { label: 'Upload operational data', detail: 'CSV in, cleaned and validated in minutes.' },
   { label: 'Predict business performance', detail: 'Forecasts, churn risk, customer segments.' },
   { label: 'Identify root causes', detail: 'Why a metric moved, not just that it did.' },
-  { label: 'Generate executive recommendations', detail: 'Prioritized actions with owners and ROI.' },
+  {
+    label: 'Generate executive recommendations',
+    detail: 'Prioritized actions with owners and ROI.',
+  },
 ];
 
 // The public entry point at "/" — unauthenticated visitors land here instead
@@ -28,10 +31,7 @@ export function LandingPage(): JSX.Element {
           <span className="text-base font-semibold tracking-tight text-slate-900">StratIQ</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            to="/login"
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
+          <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">
             Log in
           </Link>
           <Link
@@ -50,15 +50,18 @@ export function LandingPage(): JSX.Element {
 
         <div className="mx-auto mt-8 max-w-2xl space-y-1.5">
           {PIPELINE_STEPS.map((step) => (
-            <p key={step.label} className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+            <p
+              key={step.label}
+              className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl"
+            >
               {step.label}.
             </p>
           ))}
         </div>
 
         <p className="mx-auto mt-6 max-w-xl text-base text-slate-500">
-          StratIQ turns raw operational data into the reasoning behind executive
-          decisions — deterministic, auditable, and ready to hand to a CEO.
+          StratIQ turns raw operational data into the reasoning behind executive decisions —
+          deterministic, auditable, and ready to hand to a CEO.
         </p>
 
         <div className="mt-8 flex items-center justify-center gap-3">

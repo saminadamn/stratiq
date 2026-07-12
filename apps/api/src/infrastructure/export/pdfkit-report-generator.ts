@@ -48,7 +48,13 @@ export class PdfKitReportGenerator implements ReportGenerator {
         const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
         if (section.paragraphs && section.paragraphs.length > 0) {
-          doc.y = drawParagraphs(doc, section.paragraphs, doc.page.margins.left, doc.y, contentWidth);
+          doc.y = drawParagraphs(
+            doc,
+            section.paragraphs,
+            doc.page.margins.left,
+            doc.y,
+            contentWidth,
+          );
         }
 
         if (section.chart) {

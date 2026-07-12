@@ -60,8 +60,8 @@ export function DatasetsListPage(): JSX.Element {
       ) : datasets.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <p className="text-sm font-medium text-slate-700">
-            Upload your first dataset to generate KPIs, predictions, executive reports, and
-            business recommendations.
+            Upload your first dataset to generate KPIs, predictions, executive reports, and business
+            recommendations.
           </p>
           <Link
             to="/datasets/upload"

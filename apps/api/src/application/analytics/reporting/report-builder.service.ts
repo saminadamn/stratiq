@@ -245,7 +245,12 @@ export class ReportBuilderService {
                 ? `${item.finding} ${item.businessImpact}`
                 : (item.rootCause ?? undefined),
             fields: item.confidence
-              ? [{ label: 'Confidence', value: CONFIDENCE_LABEL[item.confidence] ?? item.confidence }]
+              ? [
+                  {
+                    label: 'Confidence',
+                    value: CONFIDENCE_LABEL[item.confidence] ?? item.confidence,
+                  },
+                ]
               : undefined,
           })),
           rows: [],
@@ -262,7 +267,9 @@ export class ReportBuilderService {
               { label: 'Timeline', value: timelineLabel(item.actionPlan) },
               {
                 label: 'Confidence',
-                value: item.confidence ? (CONFIDENCE_LABEL[item.confidence] ?? item.confidence) : '—',
+                value: item.confidence
+                  ? (CONFIDENCE_LABEL[item.confidence] ?? item.confidence)
+                  : '—',
               },
             ],
           })),

@@ -33,7 +33,10 @@ export function PieBreakdownChart({ data }: { data: CategoryValueDto[] }): JSX.E
           strokeWidth={2}
         >
           {segments.map((entry, index) => (
-            <Cell key={entry.label} fill={CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length] ?? '#0d9488'} />
+            <Cell
+              key={entry.label}
+              fill={CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length] ?? '#0d9488'}
+            />
           ))}
         </Pie>
         {/* Text carries identity alongside the fill (dataviz skill: "never

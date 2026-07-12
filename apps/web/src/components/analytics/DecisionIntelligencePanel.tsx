@@ -165,7 +165,8 @@ function ExecutiveView({
               <li key={cause.id}>
                 {cause.finding && cause.businessImpact ? (
                   <>
-                    <span>{cause.finding}</span> <span className="text-slate-600">{cause.businessImpact}</span>
+                    <span>{cause.finding}</span>{' '}
+                    <span className="text-slate-600">{cause.businessImpact}</span>
                   </>
                 ) : (
                   cause.rootCause
@@ -236,7 +237,9 @@ function ExecutiveView({
                         Confidence
                       </dt>
                       <dd className="mt-0.5 text-sm font-medium text-slate-900">
-                        {recommendation.confidence ? CONFIDENCE_LABEL[recommendation.confidence] : '—'}
+                        {recommendation.confidence
+                          ? CONFIDENCE_LABEL[recommendation.confidence]
+                          : '—'}
                       </dd>
                     </div>
                   </dl>

@@ -135,7 +135,12 @@ export function drawCards(
     if (card.fields && card.fields.length > 0) {
       const fieldWidth = innerWidth / card.fields.length;
       const fieldTextWidth = fieldWidth - 6;
-      doc.strokeColor(BORDER_COLOR).lineWidth(0.5).moveTo(innerX, rowY).lineTo(innerX + innerWidth, rowY).stroke();
+      doc
+        .strokeColor(BORDER_COLOR)
+        .lineWidth(0.5)
+        .moveTo(innerX, rowY)
+        .lineTo(innerX + innerWidth, rowY)
+        .stroke();
       rowY += 6;
       card.fields.forEach((field, i) => {
         const fieldX = innerX + fieldWidth * i;
