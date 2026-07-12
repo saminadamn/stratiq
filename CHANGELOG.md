@@ -3,6 +3,21 @@
 This project doesn't (yet) use tagged GitHub releases — this file tracks
 the same milestones by what shipped, grouped the way the sprints were run.
 
+## Product polish — executive-grade redesign
+
+- Public landing page at `/` (new hero, capability line, four-step feature
+  grid); unauthenticated visitors no longer bounce straight to `/login`.
+- Structured Decision Intelligence narrative fields (`finding`,
+  `businessImpact`, `confidence`, `severity`, `changePercent`, `team`) on
+  `DecisionRecommendation`, replacing raw rule-engine text across the
+  dashboards, the Insights panel, and the Recommendation Report PDF — see
+  `docs/ARCHITECTURE.md`'s "Executive-grade product redesign" section.
+- Restyled charts, KPI cards, and recommendation cards; renamed the
+  dashboard persona toggle's "Manager" view label to "Operations."
+- Fixed a bug where legacy (pre-migration) recommendation rows were served
+  forever instead of being regenerated with the new narrative fields, and
+  a PDF footer bug that silently tripled some reports' page counts.
+
 ## v1.1 — Distributed Systems Showcase
 
 - **Redis-backed caching**: `RedisAnalyticsCache` behind the existing

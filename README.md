@@ -373,10 +373,20 @@ reports as PDFs with embedded vector charts, a download center, and report histo
 reverse proxy, liveness/readiness health checks, structured logging, API rate limiting,
 and environment validation that refuses to boot with placeholder secrets in production.
 
+**v1.1 — Distributed systems showcase** — Redis-backed analytics caching and rate
+limiting, an async BullMQ report-generation queue with a graceful in-process fallback,
+and observability (correlation IDs, `/metrics`, a Redis readiness check) — see
+[ADR 0006–0008](docs/adr) and the env var table above.
+
+**Product polish** — a public landing page at `/`, structured Decision Intelligence
+narrative fields (finding / business impact / confidence, instead of raw rule-engine
+text) shared by the dashboards and the Recommendation Report PDF — see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#executive-grade-product-redesign).
+
 ## Testing
 
 ```bash
-npm run test              # backend: 175+ unit + integration tests (Vitest, real Postgres)
+npm run test              # backend: 195+ unit + integration tests (Vitest, real Postgres)
 cd apps/ml-service && pytest   # ML service: unit + FastAPI integration tests
 ```
 

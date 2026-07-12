@@ -309,3 +309,50 @@ separate background-worker product. `WORKER_MODE=standalone`, used by the dedica
 `worker` container in both compose files, is the actual "independently scalable process"
 demonstration — multiple standalone workers consuming one queue concurrently is BullMQ's
 normal scaling behavior, not a special mode.
+
+# Executive-grade product redesign
+
+A pass over the frontend and reporting surface to read as a finished product rather than
+a working prototype: a public landing page, restyled charts/KPI cards, and — the one
+change with real architectural weight — structured narrative fields on
+`DecisionRecommendation` instead of raw rule-engine text.
+
+## Decision Intelligence narratives are structured fields, not prose strings
+
+`DecisionRecommendation` gained `finding`, `businessImpact`, `confidence`, `severity`,
+`changePercent` (ROOT_CAUSE rows), and `team` (RECOMMENDATION rows) — a schema migration
+(`20260711162044_decision_intelligence_narrative_fields`), not just a rendering change.
+Before this, the Executive/Manager/Analyst views, the Insights panel, and the
+Recommendation Report PDF all rendered whatever sentence the rule engine happened to
+generate. Splitting "what we found" (`finding`), "why it matters" (`businessImpact`),
+and "how sure we are" (`confidence`) into distinct fields lets the UI and PDF format each
+one differently (a headline vs. a consequence sentence vs. a confidence badge) without
+string-parsing a single blob — the same "derive structure at generation time, not at
+render time" instinct behind `RootCauseAnalysisService`/`RecommendationEngineService`
+already being deterministic template generators (ADR 0005).
+
+Rows generated before this migration have `finding`/`confidence` as `null` — rather than
+leave them stuck rendering the old raw text forever, `GenerateDecisionIntelligenceService
+.ensureGenerated` treats a dataset version with any legacy (`finding: null` /
+`confidence: null`) row as stale and regenerates the whole set, on top of its existing
+"generate once per dataset version" idempotency. This was a real bug caught only by
+exercising the app end-to-end with pre-migration data still in the database, not by any
+automated test — the integration tests always start from a fresh dataset version, so
+they never had a legacy row to regenerate in the first place.
+
+## Public landing page at `/`
+
+Unauthenticated visitors previously bounced straight to `/login`. `/` is now a public
+marketing page (`LandingPage.tsx`) — a signed-in visitor is redirected on to
+`/analytics/executive` immediately, so this only changes what a logged-out visitor sees,
+not the authenticated app's routing.
+
+## PDF footer pagination bug: PDFKit's implicit auto-pagination triggers inside the margin by design
+
+`addFooters()` intentionally draws each page's footer _inside_ the bottom margin (below
+the normal content area) — but PDFKit auto-paginates on any `.text()` call past
+`page.height - margins.bottom`, regardless of `lineBreak: false` or an explicit `y`. Every
+footer draw was silently appending one blank page, tripling some reports' page counts.
+Fixed by zeroing `page.margins.bottom` for the duration of each footer draw so PDFKit's
+own boundary check never trips, then restoring it. Affects all four PDF report types,
+since they share the same `addFooters()` call.
