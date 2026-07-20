@@ -6,393 +6,257 @@
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-multi--stage-2496ED?logo=docker&logoColor=white)
 
-Enterprise Business Intelligence & Decision Intelligence Platform. See
-[CHANGELOG.md](CHANGELOG.md) for what shipped in each phase.
+A full-stack business intelligence platform: it takes a company's raw data (CSV uploads), turns it into dashboards and KPIs, runs machine learning models to predict things like customer churn and sales, and generates prioritized business recommendations — all packaged with the kind of production infrastructure (auth, caching, job queues, monitoring) a real company would actually run.
 
-> **Status:** v1.1. Multi-tenant auth/RBAC, dataset ETL, four analytics dashboards,
-> an Analytics Intelligence Layer (trends/benchmarks/business rules/insights/alerts),
-> Predictive Intelligence (churn/forecast/segmentation/recommendations), a deterministic
-> Decision Intelligence Engine, executive PDF reporting, production Docker/nginx
-> deployment, and an optional distributed-systems path (Redis caching/rate-limiting, a
-> BullMQ report queue, correlation-ID/`/metrics` observability) are all implemented. See
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the reasoning behind each decision.
+Live demo: **[stratiq-web.vercel.app](https://stratiq-web.vercel.app)**
 
-## Stack
+I built this to practice designing a system the way a small SaaS company actually would — including the parts that don't show up in a tutorial, like tenant isolation, background job queues, and graceful degradation when Redis isn't configured.
 
-| Layer         | Choice                                                                  |
-| ------------- | ----------------------------------------------------------------------- |
-| Frontend      | React + TypeScript + Tailwind CSS (Vite)                                |
-| Backend       | Express + TypeScript (Clean Architecture)                               |
-| ML service    | Python + FastAPI + scikit-learn (internal-only, called by the API)      |
-| Database      | PostgreSQL + Prisma ORM                                                 |
-| Auth          | JWT (access + refresh) with role-based access control                   |
-| Logging       | pino (structured JSON), correlation IDs via child loggers               |
-| Rate limiting | express-rate-limit (in-memory, or Redis-backed when `REDIS_URL` is set) |
-| Caching       | In-memory, or Redis-backed when `REDIS_URL` is set                      |
-| Job queue     | BullMQ (Redis), with an in-process fallback — see ADR 0007              |
-| Metrics       | `prom-client` at `GET /metrics` (Prometheus exposition format)          |
-| Dev env       | Docker Compose (optional `redis` service)                               |
-| Production    | Multi-stage Docker builds + nginx reverse proxy                         |
-| CI            | GitHub Actions (lint, typecheck, test, build)                           |
+---
 
-## Monorepo layout
+## What it actually does
+
+1. **Upload a dataset** (CSV) — it gets validated, cleaned, and versioned so nothing is silently overwritten.
+2. **View dashboards** — Executive, Customer, Product, and Inventory views built from that data, with KPI tracking, trend detection, and configurable business rules that flag anomalies.
+3. **See predictions** — a separate Python service trains models (scikit-learn) for churn risk, sales forecasting, customer segmentation, and product recommendations, and explains *why* each prediction was made.
+4. **Get recommendations** — a rules-based engine (deliberately not an LLM — see [why below](#why-no-llms)) combines the KPIs, predictions, and business rules into prioritized action items with estimated ROI and a 30/60/90-day plan.
+5. **Export a report** — Executive Summary, KPI, Prediction, or Recommendation reports as PDFs with real charts, not screenshots.
+
+Everything is multi-tenant: each company's data is isolated by an `organizationId` on every table, enforced in the data-access layer rather than relying only on database-level row security.
+
+---
+
+## Tech stack
+
+| Layer | Technology | Why |
+|---|---|---|
+| Frontend | React + TypeScript + Tailwind (Vite) | Fast dev loop, typed end-to-end |
+| Backend API | Express + TypeScript, Clean Architecture | Business logic doesn't depend on Express or Prisma — it's testable in isolation |
+| ML service | Python + FastAPI + scikit-learn | Kept as a separate internal service so a Python crash never takes down the main API |
+| Database | PostgreSQL + Prisma | One database handles both relational data (users, roles) and semi-structured data (dataset rows, ML features via JSONB) |
+| Auth | JWT (access + refresh), RBAC | Two separate signing keys, so a leaked access-token secret can't be used to forge refresh tokens |
+| Caching / rate limiting | In-memory by default, Redis when configured | Works out of the box on one machine; scales to multiple instances without a code change |
+| Job queue | BullMQ (Redis), in-process fallback | Report generation is the slowest request — queued so it doesn't block, but doesn't *require* Redis to work |
+| Logging & metrics | pino (structured JSON) + Prometheus `/metrics` | Every log line is tagged with a request ID for tracing a single request through the system |
+| Deployment | Docker Compose, multi-stage builds, nginx | Only nginx is exposed publicly; database, API, and ML service stay on the internal network |
+| CI | GitHub Actions | Lint, typecheck, test, and build on every push |
+
+**Full reasoning for each major decision is written up in [docs/ARCHITECTURE.md](https://github.com/saminadamn/stratiq/blob/main/docs/ARCHITECTURE.md) and as individual ADRs — see the table further down.**
+
+---
+
+## Project layout
 
 ```
 StratIQ/
 ├── apps/
-│   ├── api/          # Express API, Clean Architecture layers
-│   ├── web/           # React dashboard (auth, datasets, analytics, predictions, reports)
-│   └── ml-service/    # Python/FastAPI predictive models — internal-only, called by api
+│   ├── api/          # Express API (Clean Architecture: routes → use cases → domain → persistence)
+│   ├── web/           # React dashboard
+│   └── ml-service/    # Python/FastAPI ML models — internal only, called by the API
 ├── packages/
-│   └── shared/        # Types/DTOs shared between api and web
-├── docker/             # Dockerfiles, dev + prod compose, nginx config
-├── docs/               # Architecture Decision Records
-└── .github/workflows   # CI
+│   └── shared/        # Types and DTOs shared between api and web
+├── docker/            # Dockerfiles + dev/prod compose + nginx config
+├── docs/              # Architecture write-up and ADRs
+└── .github/workflows  # CI
 ```
 
-## System Design
+---
 
-<img width="3734" height="4939" alt="Client-Driven API Graph-2026-07-10-104902" src="https://github.com/user-attachments/assets/e23b0cff-d82d-4718-ba1d-c28886964569" />
+## System design
 
-## API Internals
+<img src="https://private-user-images.githubusercontent.com/170039652/619973253-e23b0cff-d82d-4718-ba1d-c28886964569.png" alt="System architecture diagram" width="800">
 
-<img width="3000" height="3348" alt="Client-Driven API Graph-2026-07-10-105154" src="https://github.com/user-attachments/assets/12f392b0-c448-4f4e-b6df-6fd928775770" />
+**API internals:**
 
-## Database Schema
+<img src="https://private-user-images.githubusercontent.com/170039652/619974281-12f392b0-c448-4f4e-b6df-6fd928775770.png" alt="API internals diagram" width="800">
 
-```mermaid
-erDiagram
-    ORGANIZATION ||--o{ MEMBERSHIP : has
-    USER ||--o{ MEMBERSHIP : has
-    ORGANIZATION ||--o{ DATASET : owns
-    DATASET ||--o{ DATASET_VERSION : has
-    DATASET_VERSION ||--o{ DATASET_ROW : contains
-    DATASET_VERSION ||--o{ INSIGHT : "analyzed into"
-    DATASET_VERSION ||--o{ ML_MODEL : "trained on"
-    ML_MODEL ||--o{ PREDICTION : produces
-    ORGANIZATION ||--o{ ALERT : generates
-    ORGANIZATION ||--o{ BUSINESS_RULE : configures
-    ORGANIZATION ||--o{ DECISION_RECOMMENDATION : produces
-    ORGANIZATION ||--o{ REPORT : generates
-    USER ||--o{ REPORT : "generated by"
+**Data model** (every table except `User` carries an `organizationId` — that's the tenant-isolation boundary):
 
-    USER {
-        string id PK
-        string email
-        string name
-    }
-    ORGANIZATION {
-        string id PK
-        string name
-    }
-    MEMBERSHIP {
-        string userId FK
-        string organizationId FK
-        enum role
-    }
-    DATASET {
-        string id PK
-        string organizationId FK
-        string name
-    }
-    DATASET_VERSION {
-        string id PK
-        string datasetId FK
-        int versionNumber
-    }
-    DATASET_ROW {
-        string datasetVersionId FK
-        json data
-    }
-    INSIGHT {
-        string id PK
-        string organizationId FK
-        string datasetVersionId FK
-        string metricKey
-    }
-    ALERT {
-        string id PK
-        string organizationId FK
-        string ruleId FK
-    }
-    BUSINESS_RULE {
-        string id PK
-        string organizationId FK
-        string metricKey
-    }
-    ML_MODEL {
-        string id PK
-        string organizationId FK
-        string datasetVersionId FK
-        enum modelKey
-        int version
-    }
-    PREDICTION {
-        string id PK
-        string organizationId FK
-        enum modelKey
-        string targetId
-    }
-    DECISION_RECOMMENDATION {
-        string id PK
-        string organizationId FK
-        enum category
-        string title
-    }
-    REPORT {
-        string id PK
-        string organizationId FK
-        string generatedById FK
-        enum type
-        enum status
-    }
+```
+ORGANIZATION ||--o{ MEMBERSHIP : has
+USER ||--o{ MEMBERSHIP : has
+ORGANIZATION ||--o{ DATASET : owns
+DATASET ||--o{ DATASET_VERSION : has
+DATASET_VERSION ||--o{ DATASET_ROW : contains
+DATASET_VERSION ||--o{ INSIGHT : "analyzed into"
+DATASET_VERSION ||--o{ ML_MODEL : "trained on"
+ML_MODEL ||--o{ PREDICTION : produces
+ORGANIZATION ||--o{ ALERT : generates
+ORGANIZATION ||--o{ BUSINESS_RULE : configures
+ORGANIZATION ||--o{ DECISION_RECOMMENDATION : produces
+ORGANIZATION ||--o{ REPORT : generates
 ```
 
-Every table (except `User`) is scoped by `organizationId` — that's the
-whole tenant-isolation model, enforced at the repository layer (every query
-takes an `organizationId`) rather than relying on row-level security alone.
+---
 
-## Architecture Decisions
+## A few decisions worth explaining
 
-Full reasoning lives in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the
-biggest single-topic decisions have their own ADRs:
+Recruiters and engineers tend to ask about these, so here's the short version. Full write-ups are linked.
 
-| Decision                                                                            | Why                                                                                                                  |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| [Clean Architecture layering](docs/adr/0001-clean-architecture.md)                  | Business logic testable without a database; ORM/framework swappable without touching use cases                       |
-| [PostgreSQL, not a separate document store](docs/adr/0002-postgresql.md)            | One database for both strictly-relational (auth/RBAC) and semi-structured (dataset rows, ML features) data via JSONB |
-| [Prisma as the ORM](docs/adr/0003-prisma.md)                                        | Compile-time-safe queries, generated migrations, isolated entirely inside `infrastructure/persistence/`              |
-| [FastAPI for the ML service](docs/adr/0004-fastapi-ml-service.md)                   | Pydantic validation + free OpenAPI docs; kept as its own internal-only process, not embedded in the Node API         |
-| [No LLMs in Decision Intelligence](docs/adr/0005-no-llms.md)                        | Fixed-template recommendations are reproducible and unit-testable — same inputs always produce the same output       |
-| [Redis caching and rate limiting](docs/adr/0006-redis-caching-and-rate-limiting.md) | In-memory cache/rate-limit state is silently wrong once the API runs on more than one instance                       |
-| [BullMQ job queue for reports](docs/adr/0007-bullmq-job-queue.md)                   | Report generation is the slowest synchronous request path; queued with a graceful in-process fallback                |
-| [Observability without a monitoring stack](docs/adr/0008-observability.md)          | Correlation IDs + `/metrics` + a Redis readiness check — real instrumentation, deliberately no Prometheus/Grafana    |
+**[Clean Architecture, not a typical Express app](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0001-clean-architecture.md)** — business logic lives in use-case classes that don't import Prisma or Express directly. This means the core logic can be unit-tested without spinning up a database, and the ORM could be swapped without touching business rules.
 
-## Prerequisites
+**[PostgreSQL for everything, including semi-structured data](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0002-postgresql.md)** — rather than adding MongoDB for flexible data, dataset rows and ML features are stored as JSONB columns in Postgres. One database to run and back up, instead of two.
 
-- Node.js 20+
-- Python 3.12+ (only needed to run `apps/ml-service` outside Docker)
-- Docker Desktop
+<a id="why-no-llms"></a>**[No LLMs in the recommendation engine, on purpose](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0005-no-llms.md)** — the Decision Intelligence engine that generates business recommendations is fixed-template and deterministic. Same inputs always produce the same output, which makes it something you can actually unit test and trust in a demo — unlike an LLM call that might phrase things differently each run.
 
-## Getting started (local development)
+**[Redis is optional, not required](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0006-redis-caching-and-rate-limiting.md)** — the app runs correctly on a single instance with in-memory caching and rate limiting. Redis is there to demonstrate what changes when you need to run more than one instance (shared cache state, a real job queue) — but nothing breaks if it's absent.
+
+**[Background jobs for report generation](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0007-bullmq-job-queue.md)** — PDF report generation is the slowest thing the API does, so it runs through a BullMQ queue when Redis is available, with an in-process fallback (`setImmediate`) when it isn't.
+
+**[Observability without a monitoring stack](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0008-observability.md)** — every request gets a correlation ID that's attached to every log line it produces and returned in error responses, plus a `/metrics` endpoint in Prometheus format. Deliberately stops short of running actual Grafana/Prometheus, since that's infrastructure, not application code.
+
+---
+
+## Running it locally
+
+**Requirements:** Node.js 20+, Docker Desktop, and Python 3.12+ (only if you want to run the ML service outside Docker).
 
 ```bash
 cp .env.example .env
 npm install
 
-# Start Postgres via Docker
+# Start Postgres
 docker compose -f docker/docker-compose.yml up -d db
 
-# Generate the Prisma client and apply migrations
+# Set up the database
 npm run prisma:generate
 npm run prisma:migrate
 
-# Run the ML service (separate terminal — see apps/ml-service/README.md)
+# Run the ML service (separate terminal)
 cd apps/ml-service
 python -m venv .venv && .venv/Scripts/activate   # .venv/bin/activate on macOS/Linux
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 
-# Run api and web in separate terminals from the repo root
+# Run the API and frontend (separate terminals, from repo root)
 npm run dev:api
 npm run dev:web
 ```
 
-Web runs at `http://localhost:5173`, API at `http://localhost:4000`
-(Swagger UI at `http://localhost:4000/api/docs`), ML service at `http://localhost:8000`.
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:4000` (Swagger docs at `/api/docs`)
+- ML service: `http://localhost:8000`
 
-**Optional: Redis.** Everything above works with no Redis at all — the
-analytics cache, rate limiter, and report generation all fall back to
-single-process behavior. To try the distributed path locally:
+**Redis is optional.** Everything above works with no Redis running at all. To try the Redis-backed path:
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d redis
-# add to .env: REDIS_URL=redis://localhost:6379
+# then add to .env: REDIS_URL=redis://localhost:6379
 ```
 
-Report generation then runs through a real BullMQ queue instead of
-`setImmediate`; `npm run dev:worker` runs a standalone worker process if
-you also want to see `WORKER_MODE=standalone` in action.
-
-To run db + api + web in containers instead (the ML service still runs on the
-host — the dev compose stack predates it):
+Or run everything (except the ML service) in containers:
 
 ```bash
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-## Production deployment
+---
 
-A separate compose stack builds every service's production Docker target
-(multi-stage: compiled/pruned Node output, a runtime-only Python image, an
-nginx-served static bundle) behind a single nginx reverse proxy. **Only
-nginx is published to the host** — Postgres, the API, the web static server,
-and the ML service all stay on the internal Docker network; the ML service
-in particular is never reachable from outside the API container.
+## Deploying to production
+
+A separate Docker Compose file builds a production image for each service and puts them behind a single nginx reverse proxy. Only nginx is exposed to the outside world — Postgres, the API, the web server, and the ML service all stay on the internal Docker network.
 
 ```bash
-cp .env.example .env   # fill in real JWT secrets — see below
+cp .env.example .env   # replace the placeholder JWT secrets first — see below
 docker compose -f docker/docker-compose.prod.yml up --build -d
 ```
 
-The stack serves on `http://localhost` (override with `HTTP_PORT` in `.env`).
-`api`'s container runs `prisma migrate deploy` automatically before starting,
-so pending migrations apply on every deploy without a separate migration
-step or job.
+The API runs pending Prisma migrations automatically on startup, so there's no separate migration step on deploy.
 
-**Before deploying to a real environment**, replace the placeholder JWT
-secrets in `.env` — `env.ts` refuses to boot with them when
-`NODE_ENV=production`:
+**Before deploying anywhere real**, generate proper JWT secrets — the app refuses to start in production with the placeholder values from `.env.example`:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Health checks: `GET /health` (liveness — process is up) and
-`GET /health/ready` (readiness — pings Postgres, the ML service, and Redis
-if configured; returns 503 if a _required_ dependency is unreachable — an
-unconfigured Redis is reported but never fails readiness, since every
-Redis-backed feature has a working fallback, see below). Both are proxied
-through nginx at the repo root, e.g. `curl http://localhost/health/ready`.
+Health checks (both proxied through nginx): `GET /health` (is the process up) and `GET /health/ready` (are Postgres, the ML service, and Redis reachable — Redis only fails this check if it's configured but unreachable, since every Redis-backed feature has a working fallback).
 
-**Redis (optional).** The prod compose stack includes a `redis` service and
-a dedicated `worker` container that consumes the report-generation queue
-(see [ADR 0007](docs/adr/0007-bullmq-job-queue.md)). Neither is required —
-leaving `REDIS_URL` unset makes the API behave exactly as it does without
-this stack section at all: in-memory analytics cache, in-memory rate
-limiting, synchronous report generation. On a single free-tier host (e.g.
-Render, with no separate background-worker product), set `REDIS_URL` to a
-managed Redis (Upstash's free tier works well — use the `rediss://` URL)
-and leave `WORKER_MODE` unset (defaults to `embedded`), so the one deployed
-API process both serves HTTP and consumes the report queue. The tradeoff:
-a free-tier instance that spins down on idle can leave an in-flight report
-stalled until the next request wakes it — switching to a paid host with a
-dedicated worker (`WORKER_MODE=standalone`) removes that limitation.
+**Running on a single free-tier host** (e.g. Render, with no separate worker product): set `REDIS_URL` to a managed Redis instance (Upstash's free tier works) and leave `WORKER_MODE` unset, so the one deployed process handles both HTTP requests and the report queue. The tradeoff is that a free host that spins down on idle can leave a report stuck mid-generation until the next request wakes it up — a paid host with a dedicated worker process (`WORKER_MODE=standalone`) avoids that.
+
+---
 
 ## Environment variables
 
-See [.env.example](.env.example) for the full list with explanations. The
-ones most likely to need changing per environment:
+Full list with explanations in [.env.example](https://github.com/saminadamn/stratiq/blob/main/.env.example). The ones you're most likely to change:
 
-| Variable                                   | Default                                         | Purpose                                                                                     |
-| ------------------------------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | (placeholders — must be replaced in production) | Token signing keys, two distinct secrets                                                    |
-| `ML_SERVICE_URL`                           | `http://localhost:8000`                         | Where the API reaches the ML service (`http://ml-service:8000` in prod compose)             |
-| `LOG_LEVEL`                                | `info`                                          | pino log level                                                                              |
-| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`  | `900000` / `300`                                | Global API rate limit (login/signup have their own fixed, stricter limit)                   |
-| `HTTP_PORT`                                | `80`                                            | Host port nginx publishes (prod compose only)                                               |
-| `REDIS_URL`                                | unset                                           | Enables the distributed path (cache/rate-limit/queue) — see ADR 0006/0007                   |
-| `REDIS_CACHE_TTL_SECONDS`                  | `86400`                                         | Memory-hygiene TTL on Redis-backed analytics cache entries (not a correctness knob)         |
-| `WORKER_MODE`                              | `embedded`                                      | `embedded` runs the report worker in-process; `standalone` for a dedicated worker container |
+| Variable | Default | What it does |
+|---|---|---|
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | placeholders — must change in production | Token signing keys (two separate secrets) |
+| `ML_SERVICE_URL` | `http://localhost:8000` | Where the API finds the ML service |
+| `LOG_LEVEL` | `info` | Logging verbosity |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | `900000` / `300` | Global API rate limit (login/signup have their own stricter limit) |
+| `HTTP_PORT` | `80` | Port nginx publishes in production |
+| `REDIS_URL` | unset | Turns on Redis-backed caching, rate limiting, and job queue |
+| `WORKER_MODE` | `embedded` | `embedded` runs the report worker inside the API process; `standalone` runs it as its own container |
+
+---
 
 ## Security
 
-What's actually implemented, not a wishlist:
+What's actually built, not a checklist for show:
 
-- **Transport/headers** — `helmet()` on every response (sensible defaults:
-  `X-Content-Type-Options`, `X-Frame-Options`, a baseline CSP, etc.)
-- **CORS** — explicit origin allowlist via `CORS_ORIGIN`, not a wildcard
-- **Auth** — bcrypt-hashed passwords; short-lived JWT access tokens +
-  rotating refresh tokens with two distinct signing secrets (a leaked
-  access-token key can't forge a refresh token, or vice versa)
-- **RBAC** — every authorization check resolves `(userId, organizationId)
-→ role` from `Membership`, never a global user role (see ADR 0001)
-- **Rate limiting** — global limit on `/api/v1/*`, plus a separate, fixed,
-  stricter limit on `/auth/login` and `/auth/signup` specifically (brute
-  force / credential-stuffing targets)
-- **Input validation** — Zod schemas at every request boundary; a failed
-  validation returns a structured 400, never an unhandled exception
-- **SQL injection** — every query goes through Prisma's parameterized
-  query builder; there is no raw string-concatenated SQL anywhere in the app
-- **Path traversal** — uploaded files are stored under a generated UUID,
-  never the user-supplied filename
-- **Error handling** — unhandled 500s return a generic message to the
-  client; the real error (with stack trace) is logged server-side via
-  pino, never leaked in the response
-- **Environment validation** — the API refuses to boot in production with
-  the placeholder JWT secrets from `.env.example`
+- **HTTP headers** — `helmet()` on every response
+- **CORS** — explicit allowlist via `CORS_ORIGIN`, no wildcard
+- **Passwords** — bcrypt-hashed
+- **Tokens** — short-lived access tokens + rotating refresh tokens, signed with two different secrets so one leaking doesn't compromise the other
+- **Authorization** — every permission check resolves `(user, organization) → role` from the membership table; there's no such thing as a global admin flag
+- **Rate limiting** — a general limit across the API, plus a tighter one specifically on login/signup to slow down credential-stuffing attempts
+- **Input validation** — every request is validated with Zod at the boundary; bad input returns a structured 400, not a stack trace
+- **SQL injection** — not possible through normal use; every query goes through Prisma's parameterized query builder, no raw string-concatenated SQL anywhere
+- **File uploads** — stored under a generated UUID, never the original filename (prevents path traversal)
+- **Error responses** — the client gets a generic message; the real error and stack trace are logged server-side only
+- **Boot-time checks** — the app won't start in production with placeholder JWT secrets still in place
 
-**Not implemented, deliberately**: CSRF protection — the API is a stateless
-Bearer-token API (no cookie-based session), which is the class of attack
-CSRF tokens exist to prevent. Not applicable here rather than skipped.
+**Deliberately not implemented:** CSRF protection. The API only accepts Bearer tokens, not cookies, which is the exact class of attack CSRF protection exists to stop — so it doesn't apply here rather than being an oversight.
+
+---
 
 ## Observability
 
-Real instrumentation, deliberately without a Prometheus/Grafana stack (see
-[ADR 0008](docs/adr/0008-observability.md) for the tradeoff):
+- **Correlation IDs** — every response includes an `X-Request-Id` header; every log line for that request carries the same ID, and it's included in any 500 error so a user can hand it to support without needing log access themselves.
+- **`GET /metrics`** — Prometheus-formatted metrics: process stats, HTTP request duration/count by route, and job queue depth when Redis is on. No authentication required, and it only ever exposes counts — never request or response bodies.
+- **`GET /health/ready`** — reports the status of the database, ML service, and Redis (`true` / `false` / `not_configured`).
 
-- **Correlation IDs** — every response carries an `X-Request-Id` header
-  (generated, or passed through from an upstream proxy); the same ID is
-  bound to every log line that request produces via a pino child logger,
-  and is included in any 500 response body so a user can hand it to
-  support without needing log access.
-- **`GET /metrics`** — Prometheus exposition format: default Node process
-  metrics, HTTP request duration/count labeled by route pattern (never raw
-  interpolated paths — bounded cardinality), and BullMQ report-queue depth
-  by state when Redis is configured. Unauthenticated by design; exposes
-  only aggregate counts, never request/response bodies.
-- **`GET /health/ready`** — now includes a `redis` field
-  (`true`/`false`/`'not_configured'`) alongside `database`/`mlService`.
+Deliberately stops short of running Grafana/Prometheus — see [ADR 0008](https://github.com/saminadamn/stratiq/blob/main/docs/adr/0008-observability.md) for why.
 
-## Scripts (root)
+---
 
-- `npm run dev:api` / `npm run dev:web` / `npm run dev:worker` — run a
-  single process in watch mode (`dev:worker` only does anything useful
-  once `REDIS_URL` is set — see [ADR 0007](docs/adr/0007-bullmq-job-queue.md))
-- `npm run build` — build shared package, then api, then web (dependency order)
-- `npm run typecheck` — `tsc --noEmit` across all workspaces
-- `npm run lint` / `npm run format` — ESLint / Prettier across the repo
-- `npm run test` — backend unit + integration tests (Vitest); ML service tests are
-  run separately with `pytest` from `apps/ml-service`
-- `npm run prisma:migrate` / `npm run prisma:migrate:deploy` / `npm run prisma:seed`
-  — database migrations (interactive / non-interactive) & seed data
+## Scripts
 
-## What's implemented
+| Command | What it does |
+|---|---|
+| `npm run dev:api` / `dev:web` / `dev:worker` | Run one service in watch mode |
+| `npm run build` | Build shared package → API → web, in that order |
+| `npm run typecheck` | `tsc --noEmit` across all workspaces |
+| `npm run lint` / `npm run format` | ESLint / Prettier |
+| `npm run test` | Backend tests (Vitest). ML service tests run separately with `pytest` from `apps/ml-service` |
+| `npm run prisma:migrate` / `prisma:migrate:deploy` / `prisma:seed` | Database migrations and seed data |
 
-**Foundation** — multi-tenant auth (JWT access + rotating refresh tokens), RBAC scoped
-to organization membership, Clean Architecture backend, dataset upload/validation/cleaning
-ETL pipeline with immutable versioned snapshots.
+---
 
-**Analytics** — Executive/Customer/Product/Inventory dashboards, a KPI engine, saved
-dashboard views, CSV/PDF/PNG export, and an Analytics Intelligence Layer (metrics registry,
-trend detection, benchmarking, configurable business rules, generated insights and alerts).
+## What's built so far
 
-**v1.0 — Predictive Intelligence** — a dedicated Python ML microservice (churn prediction,
-sales forecasting, customer segmentation, product recommendations) with a versioned model
-registry, a feature store, per-prediction explainability, and REST endpoints consumed by
-the Node API.
+- **Foundation** — multi-tenant auth (JWT + refresh tokens), role-based access control, Clean Architecture backend, a CSV upload pipeline with validation, cleaning, and versioned snapshots
+- **Analytics** — four dashboards (Executive, Customer, Product, Inventory), a KPI engine, saved views, CSV/PDF/PNG export, trend detection, configurable business rules, generated insights and alerts
+- **Predictive intelligence** — a Python ML service for churn prediction, sales forecasting, customer segmentation, and product recommendations, with a versioned model registry and per-prediction explanations
+- **Decision intelligence** — a deterministic engine that turns KPIs, insights, and predictions into prioritized recommendations with ROI estimates and a 30/60/90-day action plan
+- **Reporting** — Executive Summary, KPI, Prediction, and Recommendation reports as PDFs with real embedded charts
+- **Production readiness** — multi-stage Docker builds, an nginx reverse proxy, liveness/readiness checks, structured logging, rate limiting, and startup checks that block insecure configs
+- **Distributed systems path** — Redis-backed caching and rate limiting, an async report queue (BullMQ) with a working fallback when Redis isn't there, and the observability described above
 
-**v1.0 — Decision Intelligence** — a deterministic engine (no LLM anywhere) that combines
-KPIs, insights, benchmarks, and predictions into root-cause analysis, prioritized
-recommendations with ROI estimates, and 30/60/90-day action plans.
+Full changelog: [CHANGELOG.md](https://github.com/saminadamn/stratiq/blob/main/CHANGELOG.md)
 
-**v1.0 — Executive Reporting** — Executive Summary, KPI, Prediction, and Recommendation
-reports as PDFs with embedded vector charts, a download center, and report history.
-
-**v1.0 — Production readiness** — multi-stage Docker builds, a single-entrypoint nginx
-reverse proxy, liveness/readiness health checks, structured logging, API rate limiting,
-and environment validation that refuses to boot with placeholder secrets in production.
-
-**v1.1 — Distributed systems showcase** — Redis-backed analytics caching and rate
-limiting, an async BullMQ report-generation queue with a graceful in-process fallback,
-and observability (correlation IDs, `/metrics`, a Redis readiness check) — see
-[ADR 0006–0008](docs/adr) and the env var table above.
-
-**Product polish** — a public landing page at `/`, structured Decision Intelligence
-narrative fields (finding / business impact / confidence, instead of raw rule-engine
-text) shared by the dashboards and the Recommendation Report PDF — see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#executive-grade-product-redesign).
+---
 
 ## Testing
 
 ```bash
-npm run test              # backend: 195+ unit + integration tests (Vitest, real Postgres)
-cd apps/ml-service && pytest   # ML service: unit + FastAPI integration tests
+npm run test                     # 195+ backend unit + integration tests (Vitest, real Postgres)
+cd apps/ml-service && pytest     # ML service unit + FastAPI integration tests
 ```
+
+---
 
 ## Known limitations
 
-`npm audit` reports advisories against `vite`/`vitest`/`esbuild`'s transitive dev-tooling
-dependencies (not runtime application code) — see
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#known-accepted-risk-dev-tooling-only-npm-audit-findings)
-for why these are tracked rather than force-upgraded within this scope.
+`npm audit` flags some advisories in `vite`/`vitest`/`esbuild`'s dev-tooling dependencies. These don't affect the running application — only the build/test tooling — and are tracked rather than force-upgraded; details in [docs/ARCHITECTURE.md](https://github.com/saminadamn/stratiq/blob/main/docs/ARCHITECTURE.md#known-accepted-risk-dev-tooling-only-npm-audit-findings).
